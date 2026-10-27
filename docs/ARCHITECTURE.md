@@ -45,7 +45,7 @@ flowchart TD
 
 ---
 
-## 3. Estructura de Directorios (Estado tras Hito 1.1)
+## 3. Estructura de Directorios (Estado tras Hito 1.2)
 
 ```text
 /
@@ -64,16 +64,19 @@ flowchart TD
 │   │   ├── difficulty/                   # Tabla de perfiles EASY, NORMAL, HARD
 │   │   ├── armory/                       # Máquina de estados de tubos y reserva de torpedos
 │   │   └── hex/                          # Geometría axial (q, r) e índice Map<string, HexCell>
-│   ├── layers/                           # Motores desacoplados (pendientes: Hitos 1.2, 1.3 y 1.4)
-│   │   ├── strategic/                    # Navegación oceánica y patrulla (Hito 1.2)
-│   │   ├── tactical/                     # Aproximación 15x15 tras ITacticalStage (Hito 1.3)
-│   │   └── arcade-torpedo/               # Periscopio, TDC y física de espoletas (Hito 1.4)
-│   ├── flow/                             # GameFlowController (integración en Hitos 1.2-1.4)
-│   └── main.ts                           # Punto de entrada de la aplicación Vite
+│   ├── layers/
+│   │   ├── strategic/                    # Capa Estratégica 12x8 (Hito 1.2 completado)
+│   │   │   ├── domain/                   # Escenario Atlántico, abanico 0/1/2 hex, energía e intercepción
+│   │   │   └── view/                     # Carta náutica Canvas 2D, unidades, HUD e input handler
+│   │   ├── tactical/                     # Aproximación 15x15 tras ITacticalStage (pendiente: Hito 1.3)
+│   │   └── arcade-torpedo/               # Periscopio, TDC y física de espoletas (pendiente: Hito 1.4)
+│   ├── flow/                             # GameFlowController y EncounterStubView (Hito 1.2 completado)
+│   └── main.ts                           # Arranque Canvas 2D conectado a GameFlowController
 └── tests/
-    └── core/                             # Suite Vitest de dominio puro (30 tests en verde)
-        ├── armory/
-        └── hex/
+    ├── core/                             # Tests unitarios de dominio nuclear (hex y armory)
+    ├── layers/
+    │   └── strategic/                    # Tests unitarios de navegación, energía y motor estratégico
+    └── flow/                             # Tests unitarios de transición entre capas en GameFlowController
 ```
 
 ---
