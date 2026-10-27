@@ -45,31 +45,33 @@ flowchart TD
 
 ---
 
-## 3. Estructura de Directorios (Proyección Fase 1 - Hito 1.1)
+## 3. Estructura de Directorios (Estado tras Hito 1.1)
 
 ```text
 /
+├── AGENTS.md                             # Reglas de ingeniería activas automáticamente en cada sesión
 ├── CHANGELOG.md                          # Historial cronológico inverso (Keep a Changelog)
 ├── docs/
 │   ├── ARCHITECTURE.md                   # Mapa modular, contratos y diagramas de flujo
+│   ├── GAME_DESIGN.md                    # Fórmulas matemáticas y reglas mecánicas cerradas
 │   ├── GAME_DESIGN_VISION.md             # Visión general y roadmap de las 6 fases
 │   ├── STATUS.md                         # Estado vivo del proyecto para handoff inmediato
 │   └── phases/
 │       └── PHASE_01_VERTICAL_SLICE.md    # Especificación funcional de la Fase 1
 ├── src/
-│   ├── core/                             # Lógica de dominio pura compartida (Hito 1.1)
+│   ├── core/                             # Lógica de dominio pura compartida (Hito 1.1 completado)
 │   │   ├── contracts/                    # Contratos inmutables e interfaces de transición
 │   │   ├── difficulty/                   # Tabla de perfiles EASY, NORMAL, HARD
 │   │   ├── armory/                       # Máquina de estados de tubos y reserva de torpedos
 │   │   └── hex/                          # Geometría axial (q, r) e índice Map<string, HexCell>
-│   ├── layers/                           # Motores desacoplados (Hitos 1.2, 1.3 y 1.4)
+│   ├── layers/                           # Motores desacoplados (pendientes: Hitos 1.2, 1.3 y 1.4)
 │   │   ├── strategic/                    # Navegación oceánica y patrulla (Hito 1.2)
 │   │   ├── tactical/                     # Aproximación 15x15 tras ITacticalStage (Hito 1.3)
 │   │   └── arcade-torpedo/               # Periscopio, TDC y física de espoletas (Hito 1.4)
 │   ├── flow/                             # GameFlowController (integración en Hitos 1.2-1.4)
 │   └── main.ts                           # Punto de entrada de la aplicación Vite
 └── tests/
-    └── core/                             # Pruebas unitarias Vitest de dominio puro (Hito 1.1)
+    └── core/                             # Suite Vitest de dominio puro (30 tests en verde)
         ├── armory/
         └── hex/
 ```

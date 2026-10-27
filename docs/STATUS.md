@@ -1,24 +1,26 @@
 # ESTADO DEL PROYECTO (HANDOFF & TRACKING)
 
 ## Estado Actual (Resumen Ejecutivo)
-El proyecto se encuentra en el arranque de la **Fase 1: Vertical Slice (Navegación, Aproximación y Disparo de Torpedo)**, específicamente en la etapa de diseño previo del **Hito 1.1 (Configuración Base, Contratos y Motor Hexagonal Puro)**. Se ha inicializado la documentación de gobernanza arquitectónica y se ha preparado la propuesta modular de ficheros para validación del usuario antes de escribir código fuente.
+Estamos en la **Fase 1: Vertical Slice (Navegación, Aproximación y Disparo de Torpedo)** con el **Hito 1.1 completado y verificado al 100%** (`tsc --noEmit`, `vite build` y 30/30 tests unitarios en Vitest pasando). El repositorio cuenta con las reglas de ingeniería persistidas en `AGENTS.md`, contratos globales inmutables entre capas, gestión de armería de torpedos parametrizada por dificultad y motor matemático hexagonal libre de bucles anidados. El proyecto está listo para iniciar el **Hito 1.2 (Capa Estratégica Mínima)**.
 
 ## Completado Recientemente
-- Revisión integral de `/docs/GAME_DESIGN_VISION.md`, `/docs/phases/PHASE_01_VERTICAL_SLICE.md` y las reglas del *Engineering Charter*.
-- Creación de `/docs/ARCHITECTURE.md` con el diagrama Mermaid de las 3 capas desacopladas, contratos de transición y diseño del motor hexagonal indexado.
-- Creación inicial de `/docs/STATUS.md` y `/CHANGELOG.md` siguiendo el protocolo de continuidad entre sesiones.
+- Persistencia automática del *Engineering Charter* en `/AGENTS.md` (cargado por defecto en nuevas sesiones y portable en Git) y reglas numéricas cerradas en `/docs/GAME_DESIGN.md`.
+- Configuración base del proyecto con TypeScript estricto (`strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`), Vite y Vitest.
+- Definición de contratos inmutables en `src/core/contracts/` (`CampaignState`, `SubmarineState`, `TorpedoArmoryState`, `DifficultyConfig`, `TheaterDefinition`, `EncounterContext`, `FiringSolutionContext`, `EncounterResult`, `ITacticalStage`) y perfiles `EASY`/`NORMAL`/`HARD` en `src/core/difficulty/DifficultyPresets.ts`.
+- Máquina de estados pura de tubos lanzatorpedos y armería en `src/core/armory/` (proa, popa, reserva finita/infinita, pausa silenciosa y penalización acústica).
+- Motor matemático hexagonal axial `(q, r)` e índice espacial inmutable `HexGridMap<TCell>` sobre `Map<HexKey, TCell>` en `src/core/hex/` con cero bucles anidados.
+- Cobertura unitaria completa en `tests/core/hex/` y `tests/core/armory/` (6 suites, 30 tests en verde).
 
 ## En Progreso (Working On)
-- Validación de la propuesta de estructura de directorios y ficheros del **Hito 1.1** (sin código fuente generado todavía, a la espera de confirmación para iniciar la implementación atómica).
+- Ninguna tarea abierta: **Hito 1.1 cerrado**. A la espera de iniciar el diseño previo del **Hito 1.2** (`src/layers/strategic/`).
 
 ## Próximos Pasos (Backlog Inmediato)
-1. **Configuración Base (Hito 1.1a):** Crear `package.json`, `tsconfig.json` (modo estricto), `vite.config.ts`, `.gitignore`, `index.html` y `src/main.ts`, verificando la ejecución de Vite y Vitest.
-2. **Contratos y Dificultad (Hito 1.1b):** Implementar los contratos inmutables en `src/core/contracts/` (`DifficultyConfig`, `TorpedoArmoryState`, `TheaterDefinition`, `SubmarineState`, `CampaignState`, `EncounterContracts`, `ITacticalStage`) y los perfiles base en `src/core/difficulty/DifficultyPresets.ts`.
-3. **Armería de Torpedos (Hito 1.1c):** Implementar `TorpedoTubeTransition.ts` y `TorpedoArmory.ts` en `src/core/armory/` (gestión de proa/popa/reserva, recarga por turnos, pausa silenciosa y penalización acústica según dificultad) con sus pruebas unitarias en `tests/core/armory/`.
-4. **Motor Matemático Hexagonal (Hito 1.1d):** Implementar `HexCoordinate.ts`, `HexMath.ts`, `HexLayout.ts` y `HexGridMap.ts` en `src/core/hex/` garantizando cero bucles anidados y cobertura completa en `tests/core/hex/`.
-5. **Cierre Documental del Hito 1.1:** Actualizar `/docs/STATUS.md` y `/CHANGELOG.md`, verificar límites de líneas (< 200 líneas por fichero) y realizar los commits atómicos correspondientes.
+1. **Diseño Previo del Hito 1.2:** Proponer la estructura modular de `src/layers/strategic/` y datos declarativos del sector Atlántico inicial (`12x8` hexágonos con agua, costa y base naval).
+2. **Motor de Dominio Estratégico:** Implementar reglas puras de movimiento por turnos (Superficie vs. Sumergido), consumo de combustible/batería y avance de recarga de tubos por turno.
+3. **Contacto Mercante e Intercepción:** Implementar el desplazamiento del mercante móvil y la detección de coincidencia/adyacencia para emitir `EncounterContext`.
+4. **Vista Estratégica Vectorial (Canvas 2D):** Renderizar el mapa hexagonal `12x8`, postura del submarino y panel instrumental de tubos lanzatorpedos desacoplado de las reglas.
+5. **Esqueleto Inicial de `GameFlowController`:** Conectar el ciclo de turnos estratégicos y el disparo de transición hacia `ITacticalStage`.
 
 ## Deuda Técnica y Decisiones Pendientes (Tech Debt)
-- **Confirmación de estructura Hito 1.1:** Pendiente aprobación del usuario sobre el desglose de archivos propuesto antes de escribir código.
-- **Orientación geométrica hexagonal:** Se propone `POINTY_TOP` como orientación estándar por defecto en `HexLayout.ts`, manteniendo soporte parametrizable para `FLAT_TOP`.
-- **Persistencia de normas y fórmulas:** Evaluar con el usuario si desea guardar el *Engineering Charter* en `/docs/ENGINEERING_CHARTER.md` y crear `/docs/GAME_DESIGN.md` al consolidar las fórmulas cerradas de la Fase 1.
+- Sin deuda técnica en el código implementado: todos los archivos se mantienen entre 9 y 167 líneas (límite < 200) y con cero bucles anidados.
+- En el Hito 1.2 deberá definirse en `/docs/GAME_DESIGN.md` la tasa exacta de consumo de diésel en superficie y de batería en inmersión por turno estratégico de 4 horas.
