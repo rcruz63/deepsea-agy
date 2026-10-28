@@ -5,11 +5,8 @@ import {
   calculateHexDistance,
   createAxialCoordinate,
   getHexNeighbor,
-} from '../../../core/hex/index.ts';
-import {
-  clampStrategicResource,
   resolveAdjacentHexDirection,
-} from '../../strategic/index.ts';
+} from '../../../core/hex/index.ts';
 import type {
   TacticalDepth,
   TacticalHexCell,
@@ -18,6 +15,10 @@ import type {
   TacticalStepDistance,
   TacticalSubmarineSnapshot,
 } from './TacticalTypes.ts';
+
+function clampTacticalPercentage(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
 
 // Gobierna el tablero local 15x15, los alcances por cota (3/2/1 hex) en un único bucle plano y el avance del mercante
 
@@ -119,8 +120,8 @@ export function applyTacticalSubmarineMovement(
   submarine: TacticalSubmarineSnapshot,
   selectedOption: TacticalReachableOption,
 ): TacticalSubmarineSnapshot {
-  const nextFuel = clampStrategicResource(submarine.fuel - selectedOption.fuelCost);
-  const nextBattery = clampStrategicResource(
+  const nextFuel = clampTacticalPercentage(submarine.fuel - selectedOption.fuelCost);
+  const nextBattery = clampTacticalPercentage(
     submarine.battery - selectedOption.batteryCost,
   );
   const nextDepth: TacticalDepth =

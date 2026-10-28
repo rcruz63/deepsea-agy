@@ -4,20 +4,22 @@ import {
   type Point2D,
   areAxialCoordinatesEqual,
 } from '../../../core/hex/index.ts';
-import type { HudInteractiveRegion } from '../../strategic/view/StrategicHudRenderer.ts';
 import type { HexTacticalEngine } from '../domain/HexTacticalEngine.ts';
 import type { TacticalDepth } from '../domain/TacticalTypes.ts';
 import {
   renderTacticalBoard,
   unprojectTacticalCanvasPoint,
 } from './TacticalBoardRenderer.ts';
-import { renderTacticalHudPanel } from './TacticalHudRenderer.ts';
+import {
+  type TacticalHudInteractiveRegion,
+  renderTacticalHudPanel,
+} from './TacticalHudRenderer.ts';
 
 // Coordina el dibujado del tablero táctico 15x15 y despacha comandos del jugador hacia HexTacticalEngine
 
 const TACTICAL_MAP_MAX_X = 655;
 
-function isInsideRegion(point: Point2D, region: HudInteractiveRegion): boolean {
+function isInsideRegion(point: Point2D, region: TacticalHudInteractiveRegion): boolean {
   return (
     point.x >= region.x &&
     point.x <= region.x + region.width &&
@@ -30,7 +32,7 @@ export class TacticalStageView {
   private readonly engine: HexTacticalEngine;
   private readonly onResolutionChanged: (resolution: TacticalStageResolution) => void;
   private hoveredHex: AxialCoordinate | null = null;
-  private lastHudRegions: readonly HudInteractiveRegion[] = [];
+  private lastHudRegions: readonly TacticalHudInteractiveRegion[] = [];
 
   public constructor(
     engine: HexTacticalEngine,

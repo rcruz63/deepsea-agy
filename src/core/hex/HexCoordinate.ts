@@ -104,3 +104,16 @@ export function getAllHexNeighbors(origin: AxialCoordinate): readonly AxialCoord
   }
   return neighbors;
 }
+
+export function resolveAdjacentHexDirection(
+  from: AxialCoordinate,
+  to: AxialCoordinate,
+  fallbackHeading: HexDirection,
+): HexDirection {
+  for (const direction of HEX_DIRECTIONS) {
+    if (areAxialCoordinatesEqual(getHexNeighbor(from, direction), to)) {
+      return direction;
+    }
+  }
+  return fallbackHeading;
+}

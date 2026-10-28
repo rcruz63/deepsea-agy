@@ -1,22 +1,17 @@
-import {
-  setArmoryReloadPaused,
-  startTorpedoReloadInArmory,
-} from '../../../core/armory/index.ts';
+import { setArmoryReloadPaused, startTorpedoReloadInArmory } from '../../../core/armory/index.ts';
 import type {
   CampaignState,
   EncounterContext,
   EncounterResult,
   NavigationStance,
+  StrategicContactState,
   TheaterDefinition,
 } from '../../../core/contracts/index.ts';
-import {
-  type AxialCoordinate,
-  type HexGridMap,
-  areAxialCoordinatesEqual,
-} from '../../../core/hex/index.ts';
+import { type AxialCoordinate, type HexGridMap, areAxialCoordinatesEqual } from '../../../core/hex/index.ts';
 import {
   ATLANTIC_MERCHANT_ROUTES,
   ATLANTIC_SECTOR_THEATER,
+  DEFAULT_ATLANTIC_WAYPOINTS,
   type StrategicMapCell,
   createAtlanticHexGrid,
   createInitialAtlanticCampaignState,
@@ -26,10 +21,7 @@ import {
   buildStrategicEncounterContext,
   findInterceptableMerchant,
 } from './StrategicMerchantController.ts';
-import {
-  type ReachableHexOption,
-  calculateReachableStrategicHexes,
-} from './StrategicMovementNavigator.ts';
+import { type ReachableHexOption, calculateReachableStrategicHexes } from './StrategicMovementNavigator.ts';
 import {
   applyStrategicMovementEnergy,
   canSubmergeSubmarine,
@@ -51,7 +43,7 @@ export class StrategicEngine {
   private state: CampaignState;
   private readonly grid: HexGridMap<StrategicMapCell>;
   private readonly theater: TheaterDefinition;
-  private readonly routesByContactId: Readonly<Record<string, readonly AxialCoordinate[]>>;
+  private routesByContactId: Readonly<Record<string, readonly AxialCoordinate[]>>;
 
   public constructor(options: StrategicEngineOptions = {}) {
     this.state = options.initialState ?? createInitialAtlanticCampaignState();
@@ -125,14 +117,8 @@ export class StrategicEngine {
     }
 
     const movedSubmarine = applyStrategicMovementEnergy(this.state.submarine, selectedOption);
-    const reloadedArmory = completeStrategicTurnArmoryReload(
-      movedSubmarine.armory,
-      this.state.difficulty,
-    );
-    const updatedContacts = advanceAllStrategicContacts(
-      this.state.contacts,
-      this.routesByContactId,
-    );
+    const reloadedArmory = completeStrategicTurnArmoryReload(movedSubmarine.armory, this.state.difficulty);
+    const updatedContacts = advanceAllStrategicContacts(this.state.contacts, this.routesByContactId);
 
     this.state = {
       ...this.state,
@@ -155,25 +141,38 @@ export class StrategicEngine {
   }
 
   public applyEncounterResult(result: EncounterResult): CampaignState {
-    const nextHull = clampStrategicResource(
-      this.state.submarine.hullIntegrity - result.hullDamageTaken,
-    );
-    const updatedContacts = this.state.contacts.map((contact) =>
+    const nextHull = clampStrategicResource(this.state.submarine.hullIntegrity - result.hullDamageTaken);
+    const updatedContacts: StrategicContactState[] = this.state.contacts.map((contact) =>
       contact.contactId === result.contactId && result.isTargetSunk
         ? { ...contact, isSunk: true }
         : contact,
     );
 
+    if (result.isTargetSunk && this.theater.surfaceShipCatalog.length > 0) {
+      updatedContacts.push(this.spawnReplacementMerchant(updatedContacts.length));
+    }
+
     this.state = {
       ...this.state,
-      submarine: {
-        ...this.state.submarine,
-        hullIntegrity: nextHull,
-        armory: result.updatedArmory,
-      },
+      submarine: { ...this.state.submarine, hullIntegrity: nextHull, armory: result.updatedArmory },
       contacts: updatedContacts,
       totalSunkTonnage: this.state.totalSunkTonnage + result.sunkTonnageAwarded,
     };
     return this.state;
+  }
+
+  private spawnReplacementMerchant(contactOrdinal: number): StrategicContactState {
+    const catalog = this.theater.surfaceShipCatalog;
+    const nextSpec = catalog[contactOrdinal % catalog.length]!;
+    const spawnWaypoint = DEFAULT_ATLANTIC_WAYPOINTS[(contactOrdinal * 3) % DEFAULT_ATLANTIC_WAYPOINTS.length]!;
+    const newContactId = `merchant_${contactOrdinal + 1}`;
+    this.routesByContactId = { ...this.routesByContactId, [newContactId]: DEFAULT_ATLANTIC_WAYPOINTS };
+    return {
+      contactId: newContactId,
+      shipSpecId: nextSpec.specId,
+      coordinate: spawnWaypoint,
+      heading: 0,
+      isSunk: false,
+    };
   }
 }

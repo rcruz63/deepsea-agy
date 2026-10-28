@@ -1,4 +1,8 @@
-import { EncounterStubView, GameFlowController } from './flow/index.ts';
+import { GameFlowController } from './flow/index.ts';
+import {
+  TorpedoArcadeEngine,
+  TorpedoArcadeStageView,
+} from './layers/arcade-torpedo/index.ts';
 import { StrategicStageView } from './layers/strategic/index.ts';
 import { toCanvasNormalizedPoint } from './layers/strategic/view/StrategicInputHandler.ts';
 import { HexTacticalEngine, TacticalStageView } from './layers/tactical/index.ts';
@@ -17,6 +21,7 @@ export function bootstrapApplicationShell(): HTMLCanvasElement | null {
   }
 
   const tacticalEngine = new HexTacticalEngine();
+  const arcadeEngine = new TorpedoArcadeEngine();
   const flowController = new GameFlowController({
     tacticalStage: tacticalEngine,
   });
@@ -31,7 +36,7 @@ export function bootstrapApplicationShell(): HTMLCanvasElement | null {
       tacticalView.render(renderingContext);
       return;
     }
-    encounterStubView.render(renderingContext, snapshot.activeFiringSolution);
+    arcadeView.render(renderingContext);
   };
 
   const strategicView = new StrategicStageView(
@@ -43,14 +48,20 @@ export function bootstrapApplicationShell(): HTMLCanvasElement | null {
   );
 
   const tacticalView = new TacticalStageView(tacticalEngine, (resolution) => {
+    if (resolution.status === 'ENTER_TORPEDO_ATTACK') {
+      arcadeEngine.startAttack(resolution.firingContext);
+    }
     flowController.applyTacticalResolution(resolution);
     renderActiveFrame();
   });
 
-  const encounterStubView = new EncounterStubView((encounterResult) => {
-    flowController.completeEncounter(encounterResult);
-    renderActiveFrame();
-  });
+  const arcadeView = new TorpedoArcadeStageView(
+    arcadeEngine,
+    (encounterResult) => {
+      flowController.completeEncounter(encounterResult);
+      renderActiveFrame();
+    },
+  );
 
   canvasElement.addEventListener('mousemove', (event: MouseEvent) => {
     const point = toCanvasNormalizedPoint(
@@ -80,7 +91,7 @@ export function bootstrapApplicationShell(): HTMLCanvasElement | null {
     } else if (snapshot.phase === 'TACTICAL_ENCOUNTER') {
       tacticalView.handlePointerClick(point);
     } else {
-      encounterStubView.handlePointerClick(point, snapshot.activeFiringSolution);
+      arcadeView.handlePointerClick(point);
     }
     renderActiveFrame();
   });

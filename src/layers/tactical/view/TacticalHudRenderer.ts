@@ -1,7 +1,15 @@
 import { canStartTorpedoReloadInArmory } from '../../../core/armory/index.ts';
 import type { TorpedoTubeState } from '../../../core/contracts/index.ts';
-import type { HudInteractiveRegion } from '../../strategic/view/StrategicHudRenderer.ts';
 import type { TacticalDepth, TacticalStateSnapshot } from '../domain/TacticalTypes.ts';
+
+export interface TacticalHudInteractiveRegion {
+  readonly actionId: string;
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly isEnabled: boolean;
+}
 
 // Renderiza el panel HUD táctico con selector de 3 cotas, telemetría AOB/banda en vivo y acciones de periscopio/ruptura
 
@@ -13,11 +21,11 @@ const DEPTH_BUTTON_SPECS: readonly { readonly depth: TacticalDepth; readonly lab
 
 function drawTacticalButton(
   context: CanvasRenderingContext2D,
-  region: HudInteractiveRegion,
+  region: TacticalHudInteractiveRegion,
   label: string,
   color: string,
   isActiveSelection = false,
-): HudInteractiveRegion {
+): TacticalHudInteractiveRegion {
   const { x, y, width, height, isEnabled } = region;
   context.fillStyle = isActiveSelection
     ? 'rgba(0, 255, 170, 0.26)'
@@ -41,8 +49,8 @@ function renderTacticalTubeRow(
   tube: TorpedoTubeState,
   canReload: boolean,
   y: number,
-): HudInteractiveRegion {
-  const region: HudInteractiveRegion = {
+): TacticalHudInteractiveRegion {
+  const region: TacticalHudInteractiveRegion = {
     actionId: `RELOAD_TUBE:${tube.tubeId}`,
     x: 680,
     y,
@@ -76,8 +84,8 @@ function renderTacticalTubeRow(
 export function renderTacticalHudPanel(
   context: CanvasRenderingContext2D,
   snapshot: TacticalStateSnapshot,
-): readonly HudInteractiveRegion[] {
-  const regions: HudInteractiveRegion[] = [];
+): readonly TacticalHudInteractiveRegion[] {
+  const regions: TacticalHudInteractiveRegion[] = [];
   const { submarine, telemetry, difficulty } = snapshot;
 
   context.fillStyle = '#061217';

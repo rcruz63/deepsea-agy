@@ -8,6 +8,14 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
 ## [Unreleased]
 
 ### Added
+- **Hito 1.4 — Capa Arcade: Ataque de Torpedos (`src/layers/arcade-torpedo/`) y Cierre de Fase 1:**
+  - Reglas mecánicas y fórmulas cerradas del Módulo Arcade A (Periscopio, TDC y física de espoletas) documentadas en `/docs/GAME_DESIGN.md` (§6).
+  - Catálogo de reconocimiento de buques (`ShipRecognitionManual.ts`) con 3 clases (`COASTAL_FREIGHTER` 85m/4.5m/2500 BRT/1 HP, `LIBERTY_CARGO` 135m/7.5m/7100 BRT/2 HP, `T2_TANKER` 160m/9.5m/10500 BRT/2 HP).
+  - Motor trigonométrico y físico de resolución de torpedos (`TorpedoResolutionEngine.ts`) que calcula el desvío longitudinal en el cruce (`longitudinalMissMeters`), ángulo de oblicuidad y desenlace (`HIT_KEEL_MAGNETIC`, `HIT_HULL`, `GLANCING_DUD`, `PASSED_UNDER_KEEL`, `MISSED_AHEAD`, `MISSED_ASTERN`).
+  - Motor de sesión de periscopio (`TorpedoArcadeEngine.ts`) con soporte para múltiples disparos consecutivos sobre blancos de 2 HP, consumo y transición de tubos a `RELOADING`, avance táctico de 5 minutos (`advanceFiveMinuteReloadTick`) y emisión de `EncounterResult`.
+  - Renderizadores Canvas 2D de periscopio sin spoilers previos al disparo (`PeriscopeLensRenderer.ts`), consola interactiva del TDC (`TdcControlPanelRenderer.ts`) y vista coordinadora (`TorpedoArcadeStageView.ts`).
+  - Generación continua de contactos mercantes de reemplazo en `StrategicEngine.applyEncounterResult` al hundir un buque enemigo, y extracción de `resolveAdjacentHexDirection` a `src/core/hex/` para garantizar aislamiento total entre las 3 capas.
+  - Nuevas suites de tests unitarios en `tests/layers/arcade-torpedo/` y test de ciclo completo de las 3 capas en `tests/flow/GameFlowController.test.ts` (15 suites / 62 tests en verde).
 - **Hito 1.3 — Capa Táctica Hexagonal 15x15 y Especificación Estratégica de Fase 2:**
   - Documentación en `/docs/GAME_DESIGN_VISION.md` y `/docs/GAME_DESIGN.md` del diseño estratégico final para la Fase 2: layout Full-Viewport (`100vw x 100vh`) con cámara *pan & zoom* y HUD superior, estética cartográfica con sistema *Marinequadrat* (`MarineQuadratMapper`) y doble escala de zoom (`24h` tránsito / `4h` patrulla).
   - Ampliación de `FiringSolutionContext` en `src/core/contracts/EncounterContracts.ts` con `distanceMeters`, `targetAngleOnBowDeg`, `targetBowSide` (`PORT` | `STARBOARD`) y `targetSpeedKnots`.
@@ -29,3 +37,6 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
   - Motor matemático hexagonal axial `(q, r)`, proyección cartesiana/demora náutica e indexación `O(1)` mediante `HexGridMap` (`src/core/hex/`) libre de bucles anidados.
   - Suite de 30 pruebas unitarias en `tests/core/` cubriendo geometría hexagonal, mapas indexados y armería de torpedos.
 - Documentación inicial de gobernanza en `/docs/ARCHITECTURE.md`, `/docs/STATUS.md` y `/CHANGELOG.md`.
+
+### Removed
+- Eliminado `src/flow/EncounterStubView.ts` al completarse la integración de `TorpedoArcadeStageView` en el Hito 1.4.

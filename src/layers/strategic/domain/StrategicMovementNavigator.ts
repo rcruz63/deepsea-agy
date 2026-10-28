@@ -4,11 +4,9 @@ import type {
 } from '../../../core/contracts/index.ts';
 import {
   type AxialCoordinate,
-  HEX_DIRECTIONS,
   type HexDirection,
   type HexKey,
-  areAxialCoordinatesEqual,
-  getHexNeighbor,
+  resolveAdjacentHexDirection,
   toHexKey,
 } from '../../../core/hex/index.ts';
 import { HexGridMap } from '../../../core/hex/index.ts';
@@ -16,6 +14,8 @@ import {
   type StrategicMapCell,
   isNavigableStrategicTerrain,
 } from './AtlanticSectorScenario.ts';
+
+export { resolveAdjacentHexDirection };
 
 // Calcula el abanico de movimiento de 0, 1 y 2 hexágonos por turno sin bucles anidados ni saltos sobre costa intransitable
 
@@ -49,19 +49,6 @@ const SUBMERGED_ENERGY_BY_STEP: Readonly<Record<0 | 1, MovementEnergyDelta>> = {
 
 function isNavigableCell(cell: StrategicMapCell): boolean {
   return isNavigableStrategicTerrain(cell.terrain);
-}
-
-export function resolveAdjacentHexDirection(
-  from: AxialCoordinate,
-  to: AxialCoordinate,
-  fallbackHeading: HexDirection,
-): HexDirection {
-  for (const direction of HEX_DIRECTIONS) {
-    if (areAxialCoordinatesEqual(getHexNeighbor(from, direction), to)) {
-      return direction;
-    }
-  }
-  return fallbackHeading;
 }
 
 export function getMovementEnergyDelta(

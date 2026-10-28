@@ -92,3 +92,43 @@ Recursos `fuel` y `battery` acotados en `[0, 100]`. La costa (`LAND`) es intrans
 - **Condición de disparo:** Cota `PERISCOPE_DEPTH` o `SURFACED`, al menos un tubo en estado `LOADED`, y distancia axial al mercante entre **`1` y `4` hexágonos** (`500m <= distanceMeters <= 2000m`).
 - **Distancia en metros (`distanceMeters`):** `relativeDistanceHexes * 500`.
 - **Ángulo en la Proa (`targetAngleOnBowDeg`):** Ángulo absoluto en `[0°, 180°]` entre el rumbo de proa del mercante y la demora náutica desde el mercante hacia el submarino (`0°` = proa pura, `90°` = través perpendicular óptimo, `180°` = popa).
+
+---
+
+## 6. Capa de Acción Arcade — Módulo A: Ataque de Torpedos (`src/layers/arcade-torpedo/`)
+
+### 6.1. Catálogo del Manual de Reconocimiento de Buques
+
+| Identificador (`RecognizedShipClass`) | Nombre | Eslora (`lengthMeters`) | Calado (`draftMeters`) | Tonelaje (`BRT`) | Resistencia (`maxHitPoints`) | Rasgos de Silueta |
+| :--- | :--- | :---: | :---: | :---: | :---: | :--- |
+| `COASTAL_FREIGHTER` | Carguero Costero | `85m` | `4.5m` | `2500` | `1` | 1 chimenea a popa, 1 mástil central. |
+| `LIBERTY_CARGO` | Mercante Estándar | `135m` | `7.5m` | `7100` | `2` | Superestructura central, 2 mástiles. |
+| `T2_TANKER` | Petrolero Oceánico | `160m` | `9.5m` | `10500` | `2` | Puente a proa, pasarela larga, chimenea a popa. |
+
+### 6.2. Parámetros del TDC (`TdcFiringInput`)
+1. `selectedTubeId`: Tubo en estado `LOADED`.
+2. `recognizedShipType`: Clase consultada en el manual (`COASTAL_FREIGHTER`, `LIBERTY_CARGO`, `T2_TANKER`).
+3. `pistolType`: Espoleta `'IMPACT' | 'MAGNETIC'`.
+4. `torpedoDepthMeters`: Profundidad regulada de `1.0m` a `12.0m` (pasos de `0.5m`).
+5. `estimatedSpeedKnots`: Velocidad estimada del blanco (`0..20` nudos).
+6. `estimatedAobDeg`: Ángulo en la proa estimado (`0°..180°`).
+
+### 6.3. Resolución Balística y de Espoleta (`TorpedoResolutionEngine`)
+1. **Desvío Longitudinal en el Cruce (`longitudinalMissMeters`):**
+   - `distanceFactor = distanceMeters / 1000`
+   - `speedErrorMeters = (estimatedSpeedKnots - targetSpeedKnots) * 8 * distanceFactor`
+   - `aobErrorMeters = (estimatedAobDeg - targetAngleOnBowDeg) * 1.2 * distanceFactor`
+   - `longitudinalMissMeters = speedErrorMeters + aobErrorMeters`
+   - Si `longitudinalMissMeters > lengthMeters / 2` -> `MISSED_AHEAD` (falla por proa).
+   - Si `longitudinalMissMeters < -lengthMeters / 2` -> `MISSED_ASTERN` (falla por popa).
+2. **Evaluación de Cota y Espoleta (cuando `|longitudinalMissMeters| <= lengthMeters / 2`):**
+   - **Caso 1 (`torpedoDepthMeters <= draftMeters` — Choque físico con el casco):**
+     - `obliquityDeg = |90 - targetAngleOnBowDeg|`.
+     - Si `obliquityDeg > impactAngleToleranceDegrees` (`60°` en Normal -> `AOB < 30°` o `AOB > 150°`) o actúa `dudProbability`, rebota sin detonar: `GLANCING_DUD` (`0` daño).
+     - En caso contrario detona contra el casco: `HIT_HULL` (`1` punto de daño estructural).
+   - **Caso 2 (`draftMeters < torpedoDepthMeters <= draftMeters + magneticWindowMeters`):**
+     - `magneticWindowMeters = 2.0m` en `EASY` y `1.5m` en `NORMAL`/`HARD`.
+     - Si `pistolType === 'MAGNETIC'`, detona bajo la quilla partiendo la viga maestra: `HIT_KEEL_MAGNETIC` (`2` puntos de daño crítico, hundimiento inmediato).
+     - Si `pistolType === 'IMPACT'`, pasa sin contacto físico: `PASSED_UNDER_KEEL` (`0` daño).
+   - **Caso 3 (`torpedoDepthMeters > draftMeters + magneticWindowMeters`):**
+     - Pasa por debajo sin activar ninguna espoleta: `PASSED_UNDER_KEEL` (`0` daño).

@@ -8,6 +8,7 @@ export {
   getDirectionVector,
   getHexNeighbor,
   parseHexKey,
+  resolveAdjacentHexDirection,
   rotateHexDirection,
   scaleAxialCoordinate,
   subtractAxialCoordinates,

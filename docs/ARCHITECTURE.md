@@ -26,7 +26,7 @@ flowchart TD
     subgraph Layers["Capas de Juego Aisladas (src/layers)"]
         Strategic["StrategicEngine ( Turnos de 4h )"]
         Tactical["ITacticalStage / HexTacticalEngine ( 15x15, Turnos de 5m )"]
-        ArcadeTorp["ArcadeEngine: Módulo A ( Ataque TDC Periscopio )"]
+        ArcadeTorp["TorpedoArcadeEngine: Módulo A ( Ataque TDC Periscopio )"]
     end
 
     GFC -->|"CampaignState"| Strategic
@@ -35,7 +35,7 @@ flowchart TD
     Tactical -->|"FiringSolutionContext"| GFC
     GFC -->|"FiringSolutionContext"| ArcadeTorp
     Tactical -->|"EncounterResult (Ruptura de contacto)"| GFC
-    ArcadeTorp -->|"EncounterResult (Impactos y tubos usados)"| GFC
+    ArcadeTorp -->|"EncounterResult (Impactos, Tonelaje y Armería)"| GFC
     GFC -->|"Actualiza CampaignState"| Strategic
 
     Strategic -.-> Core
@@ -45,7 +45,7 @@ flowchart TD
 
 ---
 
-## 3. Estructura de Directorios (Estado tras Hito 1.3)
+## 3. Estructura de Directorios (Estado tras Cierre de Fase 1 — Hitos 1.1 a 1.4)
 
 ```text
 /
@@ -66,20 +66,23 @@ flowchart TD
 │   │   └── hex/                          # Geometría axial (q, r) e índice Map<string, HexCell>
 │   ├── layers/
 │   │   ├── strategic/                    # Capa Estratégica 12x8 (Hito 1.2 completado)
-│   │   │   ├── domain/                   # Escenario Atlántico, abanico 0/1/2 hex, energía e intercepción
+│   │   │   ├── domain/                   # Escenario Atlántico, abanico 0/1/2 hex, energía, intercepción y reemplazo de contactos
 │   │   │   └── view/                     # Carta náutica Canvas 2D, unidades, HUD e input handler
 │   │   ├── tactical/                     # Capa Táctica 15x15 tras ITacticalStage (Hito 1.3 completado)
 │   │   │   ├── domain/                   # Cotas, alcance 0..3 hex, geometría AOB/banda y HexTacticalEngine
 │   │   │   └── view/                     # Plotter 15x15, anillo de tiro 1..4 hex, HUD y periscopio
-│   │   └── arcade-torpedo/               # Periscopio, TDC y física de espoletas (pendiente: Hito 1.4)
-│   ├── flow/                             # GameFlowController y stub de FiringSolutionContext (Hito 1.3)
-│   └── main.ts                           # Arranque Canvas 2D conectado a las 3 fases de GameFlowController
+│   │   └── arcade-torpedo/               # Capa Arcade Módulo A: Periscopio y TDC (Hito 1.4 completado)
+│   │       ├── domain/                   # ShipRecognitionManual, TorpedoTypes, TorpedoResolutionEngine y TorpedoArcadeEngine
+│   │       └── view/                     # PeriscopeLensRenderer (sin spoilers), TdcControlPanelRenderer y TorpedoArcadeStageView
+│   ├── flow/                             # GameFlowController y GameFlowState (Ciclo 3 capas cerrado)
+│   └── main.ts                           # Arranque Canvas 2D conectado a las 3 capas vía GameFlowController
 └── tests/
     ├── core/                             # Tests unitarios de dominio nuclear (hex y armory)
     ├── layers/
     │   ├── strategic/                    # Tests unitarios de navegación, energía y motor estratégico
-    │   └── tactical/                     # Tests unitarios de movimiento táctico, geometría AOB y motor 15x15
-    └── flow/                             # Tests unitarios de transición entre capas en GameFlowController
+    │   ├── tactical/                     # Tests unitarios de movimiento táctico, geometría AOB y motor 15x15
+    │   └── arcade-torpedo/               # Tests unitarios de trigonometría TDC, espoletas y secuencia multidisparo
+    └── flow/                             # Tests unitarios de integración del ciclo completo de las 3 capas
 ```
 
 ---
@@ -94,7 +97,7 @@ flowchart TD
 | `SubmarineState` | Posición axial, rumbo, postura (`SURFACED` / `SUBMERGED`), cota, combustible, baterías, integridad del casco y `TorpedoArmoryState`. |
 | `CampaignState` | Estado raíz de la patrulla activa: teatro cargado, turno global, dificultad, estado del submarino, contactos móviles y tonelaje hundido. |
 | `EncounterContext` | Fotografía inmutable enviada desde `StrategicLayer` hacia `ITacticalStage` al interceptar un contacto. |
-| `FiringSolutionContext` | Fotografía geométrica (distancia relativa real, AOB real, buque objetivo y armería) enviada hacia `ArcadeLayer` al subir el periscopio. |
+| `FiringSolutionContext` | Fotografía geométrica (distancia relativa real, AOB real, banda `PORT`/`STARBOARD`, velocidad real, buque objetivo y armería) enviada hacia `ArcadeLayer` al subir el periscopio. |
 | `EncounterResult` | Resultado inmutable devuelto a `StrategicLayer` (armería actualizada, daño sufrido, hundimiento del blanco, tonelaje y tiempo consumido). |
 | `ITacticalStage` | Contrato polimórfico que aísla la implementación del tablero táctico (hexagonal 15x15 vs. futuro ploteo polar por anillos). |
 

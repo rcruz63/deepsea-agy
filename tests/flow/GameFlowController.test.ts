@@ -3,10 +3,12 @@ import { fireTorpedoTubeInArmory } from '../../src/core/armory/index.ts';
 import type { ITacticalStage } from '../../src/core/contracts/index.ts';
 import { createAxialCoordinate } from '../../src/core/hex/index.ts';
 import { GameFlowController } from '../../src/flow/index.ts';
+import { TorpedoArcadeEngine } from '../../src/layers/arcade-torpedo/index.ts';
 import {
   StrategicEngine,
   createInitialAtlanticCampaignState,
 } from '../../src/layers/strategic/index.ts';
+import { HexTacticalEngine } from '../../src/layers/tactical/index.ts';
 
 describe('GameFlowController', () => {
   it('transitions from STRATEGIC_PATROL to TACTICAL_ENCOUNTER and back with EncounterResult', () => {
@@ -57,6 +59,10 @@ describe('GameFlowController', () => {
     expect(returnedSnapshot.phase).toBe('STRATEGIC_PATROL');
     expect(returnedSnapshot.campaignState.totalSunkTonnage).toBe(7100);
     expect(returnedSnapshot.campaignState.contacts[0]?.isSunk).toBe(true);
+    // Verifica que aparece un nuevo contacto mercante de reemplazo tras hundir al objetivo
+    expect(
+      returnedSnapshot.campaignState.contacts.some((contact) => !contact.isSunk),
+    ).toBe(true);
   });
 
   it('rejects beginning an encounter when no merchant is within interception range', () => {
@@ -64,7 +70,7 @@ describe('GameFlowController', () => {
     expect(() => controller.beginTacticalEncounter()).toThrow();
   });
 
-  it('transitions to ARCADE_TORPEDO when applyTacticalResolution receives ENTER_TORPEDO_ATTACK', () => {
+  it('executes the complete 3-layer cycle: Strategic -> Tactical -> Arcade Torpedo -> Strategic', () => {
     const baseState = createInitialAtlanticCampaignState();
     const strategicEngine = new StrategicEngine({
       initialState: {
@@ -75,34 +81,54 @@ describe('GameFlowController', () => {
         },
       },
     });
-    const controller = new GameFlowController({ strategicEngine });
-    const tacticalSnapshot = controller.beginTacticalEncounter();
-    if (tacticalSnapshot.phase !== 'TACTICAL_ENCOUNTER') {
-      throw new Error('Se esperaba TACTICAL_ENCOUNTER');
-    }
-
-    const arcadeSnapshot = controller.applyTacticalResolution({
-      status: 'ENTER_TORPEDO_ATTACK',
-      tacticalTurnsElapsed: 2,
-      firingContext: {
-        contactId: 'merchant_alpha',
-        armory: baseState.submarine.armory,
-        difficulty: baseState.difficulty,
-        targetShip: tacticalSnapshot.activeEncounter.targetShip,
-        relativeDistanceHexes: 2,
-        distanceMeters: 1000,
-        targetAngleOnBowDeg: 90,
-        trueAngleOnBowDegrees: 90,
-        targetBowSide: 'STARBOARD',
-        targetSpeedKnots: 10,
-        hullIntegrityAtPeriscope: 100,
-      },
+    const tacticalEngine = new HexTacticalEngine();
+    const arcadeEngine = new TorpedoArcadeEngine();
+    const controller = new GameFlowController({
+      strategicEngine,
+      tacticalStage: tacticalEngine,
     });
 
+    // 1. Capa Estratégica -> Táctica
+    const tacticalSnapshot = controller.beginTacticalEncounter();
+    expect(tacticalSnapshot.phase).toBe('TACTICAL_ENCOUNTER');
+
+    // 2. Capa Táctica: pasar a profundidad PERISCOPE_DEPTH y subir periscopio (a 3 hexágonos = 1500m)
+    tacticalEngine.executeCommand({
+      type: 'SET_DEPTH',
+      depth: 'PERISCOPE_DEPTH',
+    });
+    const resolution = tacticalEngine.executeCommand({
+      type: 'RAISE_PERISCOPE_AND_LOCK',
+    });
+    expect(resolution.status).toBe('ENTER_TORPEDO_ATTACK');
+
+    const arcadeSnapshot = controller.applyTacticalResolution(resolution);
     expect(arcadeSnapshot.phase).toBe('ARCADE_TORPEDO');
-    if (arcadeSnapshot.phase === 'ARCADE_TORPEDO') {
-      expect(arcadeSnapshot.activeFiringSolution.distanceMeters).toBe(1000);
-      expect(arcadeSnapshot.activeFiringSolution.targetBowSide).toBe('STARBOARD');
+    if (arcadeSnapshot.phase !== 'ARCADE_TORPEDO') {
+      throw new Error('Se esperaba ARCADE_TORPEDO');
     }
+
+    // 3. Capa Arcade: configurar TDC con impacto magnético bajo quilla y hundir el blanco
+    arcadeEngine.startAttack(arcadeSnapshot.activeFiringSolution);
+    arcadeEngine.updateTdcInput({
+      recognizedShipType: 'LIBERTY_CARGO',
+      pistolType: 'MAGNETIC',
+      torpedoDepthMeters: 8.5,
+      estimatedSpeedKnots: arcadeSnapshot.activeFiringSolution.targetSpeedKnots,
+      estimatedAobDeg: arcadeSnapshot.activeFiringSolution.targetAngleOnBowDeg,
+    });
+
+    const shot = arcadeEngine.fireSelectedTorpedo(0.99);
+    expect(shot.outcome).toBe('HIT_KEEL_MAGNETIC');
+
+    // 4. Retorno a Capa Estratégica con EncounterResult
+    const finalSnapshot = controller.completeEncounter(
+      arcadeEngine.buildEncounterResult(2),
+    );
+    expect(finalSnapshot.phase).toBe('STRATEGIC_PATROL');
+    expect(finalSnapshot.campaignState.totalSunkTonnage).toBe(7100);
+    expect(
+      finalSnapshot.campaignState.submarine.armory.bowTubes[0]?.status,
+    ).toBe('RELOADING');
   });
 });

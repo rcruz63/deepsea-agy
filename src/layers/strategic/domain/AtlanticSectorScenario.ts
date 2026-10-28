@@ -59,50 +59,52 @@ export const ATLANTIC_SECTOR_THEATER: TheaterDefinition = {
   ],
   surfaceShipCatalog: [
     {
-      specId: 'freighter_liberty',
-      className: 'Carguero Clase Liberty',
+      specId: 'LIBERTY_CARGO',
+      className: 'Mercante Estándar Liberty',
       tonnage: 7100,
-      draftMeters: 8.4,
+      draftMeters: 7.5,
       cruiseSpeedKnots: 10,
       isArmedEscort: false,
     },
     {
-      specId: 'tanker_t2',
-      className: 'Petrolero Costero T2',
-      tonnage: 10400,
-      draftMeters: 9.1,
+      specId: 'T2_TANKER',
+      className: 'Petrolero Oceánico T2',
+      tonnage: 10500,
+      draftMeters: 9.5,
       cruiseSpeedKnots: 11,
       isArmedEscort: false,
     },
     {
-      specId: 'coaster_tramp',
-      className: 'Vapor Mercante Ligero',
-      tonnage: 3200,
-      draftMeters: 5.5,
+      specId: 'COASTAL_FREIGHTER',
+      className: 'Carguero Costero',
+      tonnage: 2500,
+      draftMeters: 4.5,
       cruiseSpeedKnots: 8,
       isArmedEscort: false,
     },
   ],
 };
 
+export const DEFAULT_ATLANTIC_WAYPOINTS: readonly AxialCoordinate[] = [
+  createAxialCoordinate(3, 5),
+  createAxialCoordinate(4, 5),
+  createAxialCoordinate(5, 5),
+  createAxialCoordinate(6, 4),
+  createAxialCoordinate(7, 3),
+  createAxialCoordinate(7, 2),
+  createAxialCoordinate(6, 2),
+  createAxialCoordinate(5, 1),
+  createAxialCoordinate(4, 1),
+  createAxialCoordinate(3, 2),
+  createAxialCoordinate(2, 3),
+  createAxialCoordinate(2, 4),
+];
+
 // Ruta circular en aguas abiertas que avanza 1 hexágono por turno de 4 horas
 export const ATLANTIC_MERCHANT_ROUTES: Readonly<
   Record<string, readonly AxialCoordinate[]>
 > = {
-  merchant_alpha: [
-    createAxialCoordinate(3, 5),
-    createAxialCoordinate(4, 5),
-    createAxialCoordinate(5, 5),
-    createAxialCoordinate(6, 4),
-    createAxialCoordinate(7, 3),
-    createAxialCoordinate(7, 2),
-    createAxialCoordinate(6, 2),
-    createAxialCoordinate(5, 1),
-    createAxialCoordinate(4, 1),
-    createAxialCoordinate(3, 2),
-    createAxialCoordinate(2, 3),
-    createAxialCoordinate(2, 4),
-  ],
+  merchant_alpha: DEFAULT_ATLANTIC_WAYPOINTS,
 };
 
 export function isNavigableStrategicTerrain(terrain: HexTerrainType): boolean {
@@ -157,7 +159,7 @@ export function createInitialAtlanticCampaignState(
     contacts: [
       {
         contactId: 'merchant_alpha',
-        shipSpecId: 'freighter_liberty',
+        shipSpecId: 'LIBERTY_CARGO',
         coordinate: createAxialCoordinate(3, 5),
         heading: 0,
         isSunk: false,
