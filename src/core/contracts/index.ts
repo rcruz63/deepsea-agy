@@ -23,6 +23,7 @@ export type {
   EncounterOutcomeReason,
   EncounterResult,
   FiringSolutionContext,
+  TargetBowSide,
   TargetShipEncounterSnapshot,
 } from './EncounterContracts.ts';
 export type { ITacticalStage, TacticalStageResolution } from './ITacticalStage.ts';

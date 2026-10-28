@@ -45,7 +45,7 @@ flowchart TD
 
 ---
 
-## 3. Estructura de Directorios (Estado tras Hito 1.2)
+## 3. Estructura de Directorios (Estado tras Hito 1.3)
 
 ```text
 /
@@ -68,14 +68,17 @@ flowchart TD
 │   │   ├── strategic/                    # Capa Estratégica 12x8 (Hito 1.2 completado)
 │   │   │   ├── domain/                   # Escenario Atlántico, abanico 0/1/2 hex, energía e intercepción
 │   │   │   └── view/                     # Carta náutica Canvas 2D, unidades, HUD e input handler
-│   │   ├── tactical/                     # Aproximación 15x15 tras ITacticalStage (pendiente: Hito 1.3)
+│   │   ├── tactical/                     # Capa Táctica 15x15 tras ITacticalStage (Hito 1.3 completado)
+│   │   │   ├── domain/                   # Cotas, alcance 0..3 hex, geometría AOB/banda y HexTacticalEngine
+│   │   │   └── view/                     # Plotter 15x15, anillo de tiro 1..4 hex, HUD y periscopio
 │   │   └── arcade-torpedo/               # Periscopio, TDC y física de espoletas (pendiente: Hito 1.4)
-│   ├── flow/                             # GameFlowController y EncounterStubView (Hito 1.2 completado)
-│   └── main.ts                           # Arranque Canvas 2D conectado a GameFlowController
+│   ├── flow/                             # GameFlowController y stub de FiringSolutionContext (Hito 1.3)
+│   └── main.ts                           # Arranque Canvas 2D conectado a las 3 fases de GameFlowController
 └── tests/
     ├── core/                             # Tests unitarios de dominio nuclear (hex y armory)
     ├── layers/
-    │   └── strategic/                    # Tests unitarios de navegación, energía y motor estratégico
+    │   ├── strategic/                    # Tests unitarios de navegación, energía y motor estratégico
+    │   └── tactical/                     # Tests unitarios de movimiento táctico, geometría AOB y motor 15x15
     └── flow/                             # Tests unitarios de transición entre capas en GameFlowController
 ```
 

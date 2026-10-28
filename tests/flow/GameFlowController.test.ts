@@ -63,4 +63,46 @@ describe('GameFlowController', () => {
     const controller = new GameFlowController();
     expect(() => controller.beginTacticalEncounter()).toThrow();
   });
+
+  it('transitions to ARCADE_TORPEDO when applyTacticalResolution receives ENTER_TORPEDO_ATTACK', () => {
+    const baseState = createInitialAtlanticCampaignState();
+    const strategicEngine = new StrategicEngine({
+      initialState: {
+        ...baseState,
+        submarine: {
+          ...baseState.submarine,
+          coordinate: createAxialCoordinate(3, 5),
+        },
+      },
+    });
+    const controller = new GameFlowController({ strategicEngine });
+    const tacticalSnapshot = controller.beginTacticalEncounter();
+    if (tacticalSnapshot.phase !== 'TACTICAL_ENCOUNTER') {
+      throw new Error('Se esperaba TACTICAL_ENCOUNTER');
+    }
+
+    const arcadeSnapshot = controller.applyTacticalResolution({
+      status: 'ENTER_TORPEDO_ATTACK',
+      tacticalTurnsElapsed: 2,
+      firingContext: {
+        contactId: 'merchant_alpha',
+        armory: baseState.submarine.armory,
+        difficulty: baseState.difficulty,
+        targetShip: tacticalSnapshot.activeEncounter.targetShip,
+        relativeDistanceHexes: 2,
+        distanceMeters: 1000,
+        targetAngleOnBowDeg: 90,
+        trueAngleOnBowDegrees: 90,
+        targetBowSide: 'STARBOARD',
+        targetSpeedKnots: 10,
+        hullIntegrityAtPeriscope: 100,
+      },
+    });
+
+    expect(arcadeSnapshot.phase).toBe('ARCADE_TORPEDO');
+    if (arcadeSnapshot.phase === 'ARCADE_TORPEDO') {
+      expect(arcadeSnapshot.activeFiringSolution.distanceMeters).toBe(1000);
+      expect(arcadeSnapshot.activeFiringSolution.targetBowSide).toBe('STARBOARD');
+    }
+  });
 });

@@ -1,6 +1,7 @@
 import { EncounterStubView, GameFlowController } from './flow/index.ts';
 import { StrategicStageView } from './layers/strategic/index.ts';
 import { toCanvasNormalizedPoint } from './layers/strategic/view/StrategicInputHandler.ts';
+import { HexTacticalEngine, TacticalStageView } from './layers/tactical/index.ts';
 
 // Conecta el controlador de flujo de las 3 capas con el lienzo Canvas 2D manteniendo la lógica de negocio desacoplada
 
@@ -15,15 +16,22 @@ export function bootstrapApplicationShell(): HTMLCanvasElement | null {
     return canvasElement;
   }
 
-  const flowController = new GameFlowController();
+  const tacticalEngine = new HexTacticalEngine();
+  const flowController = new GameFlowController({
+    tacticalStage: tacticalEngine,
+  });
 
   const renderActiveFrame = (): void => {
     const snapshot = flowController.getSnapshot();
     if (snapshot.phase === 'STRATEGIC_PATROL') {
       strategicView.render(renderingContext);
-    } else {
-      encounterStubView.render(renderingContext, snapshot.activeEncounter);
+      return;
     }
+    if (snapshot.phase === 'TACTICAL_ENCOUNTER') {
+      tacticalView.render(renderingContext);
+      return;
+    }
+    encounterStubView.render(renderingContext, snapshot.activeFiringSolution);
   };
 
   const strategicView = new StrategicStageView(
@@ -33,6 +41,11 @@ export function bootstrapApplicationShell(): HTMLCanvasElement | null {
       renderActiveFrame();
     },
   );
+
+  const tacticalView = new TacticalStageView(tacticalEngine, (resolution) => {
+    flowController.applyTacticalResolution(resolution);
+    renderActiveFrame();
+  });
 
   const encounterStubView = new EncounterStubView((encounterResult) => {
     flowController.completeEncounter(encounterResult);
@@ -45,8 +58,12 @@ export function bootstrapApplicationShell(): HTMLCanvasElement | null {
       event.clientX,
       event.clientY,
     );
-    if (flowController.getSnapshot().phase === 'STRATEGIC_PATROL') {
+    const snapshot = flowController.getSnapshot();
+    if (snapshot.phase === 'STRATEGIC_PATROL') {
       strategicView.handlePointerMove(point);
+      renderActiveFrame();
+    } else if (snapshot.phase === 'TACTICAL_ENCOUNTER') {
+      tacticalView.handlePointerMove(point);
       renderActiveFrame();
     }
   });
@@ -60,8 +77,10 @@ export function bootstrapApplicationShell(): HTMLCanvasElement | null {
     const snapshot = flowController.getSnapshot();
     if (snapshot.phase === 'STRATEGIC_PATROL') {
       strategicView.handlePointerClick(point);
+    } else if (snapshot.phase === 'TACTICAL_ENCOUNTER') {
+      tacticalView.handlePointerClick(point);
     } else {
-      encounterStubView.handlePointerClick(point, snapshot.activeEncounter);
+      encounterStubView.handlePointerClick(point, snapshot.activeFiringSolution);
     }
     renderActiveFrame();
   });

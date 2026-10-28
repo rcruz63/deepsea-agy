@@ -3,6 +3,7 @@ import type {
   EncounterResult,
   FiringSolutionContext,
   ITacticalStage,
+  TacticalStageResolution,
 } from '../core/contracts/index.ts';
 import { StrategicEngine } from '../layers/strategic/domain/StrategicEngine.ts';
 import type { GameFlowSnapshot } from './GameFlowState.ts';
@@ -27,6 +28,10 @@ export class GameFlowController {
 
   public getStrategicEngine(): StrategicEngine {
     return this.strategicEngine;
+  }
+
+  public getTacticalStage(): ITacticalStage | undefined {
+    return this.tacticalStage;
   }
 
   public getSnapshot(): GameFlowSnapshot {
@@ -73,6 +78,18 @@ export class GameFlowController {
       this.tacticalStage.startEncounter(resolvedContext);
     }
 
+    return this.getSnapshot();
+  }
+
+  public applyTacticalResolution(
+    resolution: TacticalStageResolution,
+  ): GameFlowSnapshot {
+    if (resolution.status === 'ENTER_TORPEDO_ATTACK') {
+      return this.enterArcadeTorpedoAttack(resolution.firingContext);
+    }
+    if (resolution.status === 'END_ENCOUNTER') {
+      return this.completeEncounter(resolution.encounterResult);
+    }
     return this.getSnapshot();
   }
 

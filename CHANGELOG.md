@@ -8,6 +8,12 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
 ## [Unreleased]
 
 ### Added
+- **Hito 1.3 — Capa Táctica Hexagonal 15x15 y Especificación Estratégica de Fase 2:**
+  - Documentación en `/docs/GAME_DESIGN_VISION.md` y `/docs/GAME_DESIGN.md` del diseño estratégico final para la Fase 2: layout Full-Viewport (`100vw x 100vh`) con cámara *pan & zoom* y HUD superior, estética cartográfica con sistema *Marinequadrat* (`MarineQuadratMapper`) y doble escala de zoom (`24h` tránsito / `4h` patrulla).
+  - Ampliación de `FiringSolutionContext` en `src/core/contracts/EncounterContracts.ts` con `distanceMeters`, `targetAngleOnBowDeg`, `targetBowSide` (`PORT` | `STARBOARD`) y `targetSpeedKnots`.
+  - Motor de dominio táctico en `src/layers/tactical/domain/` (`TacticalTypes`, `TacticalMovementRules`, `TacticalFiringGeometry`, `HexTacticalEngine`) implementando `ITacticalStage` con tablero `15x15` (`1 hex = 500m`), cotas (`SURFACED`, `PERISCOPE_DEPTH`, `DEEP`), avance de `1 tick` de recarga por turno de 5 minutos, bloqueo de superposición con el blanco y escape automático por borde del mapa.
+  - Vista táctica vectorial en `src/layers/tactical/view/` (`TacticalBoardRenderer`, `TacticalHudRenderer`, `TacticalStageView`) e integración completa en `GameFlowController` y `EncounterStubView`.
+  - Nuevas suites de tests unitarios en `tests/layers/tactical/` y `tests/flow/` (13 suites / 54 tests en verde).
 - **Hito 1.2 — Capa Estratégica Mínima y Esqueleto de `GameFlowController`:**
   - Reglas mecánicas del turno estratégico de 4 horas documentadas en `/docs/GAME_DESIGN.md` (escalas 0..100 de diésel y batería, alcances 0/1/2 por postura, emersión forzada a batería 0, recarga completa de tubos e intercepción a distancia `<= 1`).
   - Motor de dominio estratégico puro en `src/layers/strategic/domain/` (`AtlanticSectorScenario`, `StrategicMovementNavigator`, `StrategicResourceRules`, `StrategicMerchantController`, `StrategicEngine`) sin dependencias del DOM/Canvas y libre de bucles anidados.

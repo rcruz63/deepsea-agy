@@ -6,6 +6,8 @@ import type { TorpedoArmoryState } from './TorpedoArmoryState.ts';
 
 // Define las fronteras inmutables de paso de mensajes para que StrategicLayer, TacticalLayer y ArcadeLayer jamás se importen entre sí
 
+export type TargetBowSide = 'PORT' | 'STARBOARD';
+
 export interface TargetShipEncounterSnapshot {
   readonly contactId: string;
   readonly spec: SurfaceShipSpec;
@@ -25,8 +27,12 @@ export interface FiringSolutionContext {
   readonly difficulty: DifficultyConfig;
   readonly targetShip: TargetShipEncounterSnapshot;
   readonly relativeDistanceHexes: number;
-  // Ángulo en la Proa (AOB) geométrico real contra el que el TDC arcade comparará la estimación manual del jugador
+  readonly distanceMeters: number;
+  // Ángulo en la Proa (AOB 0°..180°) y banda (PORT/STARBOARD) reales para escalar y orientar la silueta en el periscopio Arcade
+  readonly targetAngleOnBowDeg: number;
   readonly trueAngleOnBowDegrees: number;
+  readonly targetBowSide: TargetBowSide;
+  readonly targetSpeedKnots: number;
   readonly hullIntegrityAtPeriscope: number;
 }
 

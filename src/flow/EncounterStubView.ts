@@ -1,12 +1,12 @@
 import { fireTorpedoTubeInArmory } from '../core/armory/index.ts';
 import type {
-  EncounterContext,
   EncounterResult,
+  FiringSolutionContext,
   TorpedoArmoryState,
 } from '../core/contracts/index.ts';
 import type { Point2D } from '../core/hex/index.ts';
 
-// Pantalla vectorial temporal (Hito 1.2) que inspecciona el EncounterContext capturado y simula el retorno EncounterResult hacia StrategicEngine
+// Pantalla puente del Hito 1.4 (Ataque Arcade TDC) que muestra el FiringSolutionContext calculado al subir el periscopio
 
 interface StubButtonBounds {
   readonly id: 'SIMULATE_SINKING' | 'SIMULATE_DISENGAGE';
@@ -17,8 +17,8 @@ interface StubButtonBounds {
 }
 
 const STUB_BUTTONS: readonly StubButtonBounds[] = [
-  { id: 'SIMULATE_SINKING', x: 150, y: 495, width: 315, height: 48 },
-  { id: 'SIMULATE_DISENGAGE', x: 495, y: 495, width: 315, height: 48 },
+  { id: 'SIMULATE_SINKING', x: 150, y: 500, width: 315, height: 48 },
+  { id: 'SIMULATE_DISENGAGE', x: 495, y: 500, width: 315, height: 48 },
 ];
 
 function consumeFirstLoadedTubeIfAvailable(
@@ -27,10 +27,9 @@ function consumeFirstLoadedTubeIfAvailable(
   const loadedTube =
     armory.bowTubes.find((tube) => tube.status === 'LOADED') ??
     armory.sternTubes.find((tube) => tube.status === 'LOADED');
-  if (loadedTube === undefined) {
-    return armory;
-  }
-  return fireTorpedoTubeInArmory(armory, loadedTube.tubeId);
+  return loadedTube === undefined
+    ? armory
+    : fireTorpedoTubeInArmory(armory, loadedTube.tubeId);
 }
 
 export class EncounterStubView {
@@ -42,7 +41,7 @@ export class EncounterStubView {
 
   public handlePointerClick(
     canvasPoint: Point2D,
-    activeEncounter: EncounterContext,
+    firingSolution: FiringSolutionContext,
   ): void {
     const clickedButton = STUB_BUTTONS.find(
       (btn) =>
@@ -57,23 +56,21 @@ export class EncounterStubView {
 
     if (clickedButton.id === 'SIMULATE_SINKING') {
       this.onCompleteEncounter({
-        contactId: activeEncounter.targetShip.contactId,
+        contactId: firingSolution.contactId,
         outcome: 'TARGET_SUNK',
-        updatedArmory: consumeFirstLoadedTubeIfAvailable(
-          activeEncounter.submarine.armory,
-        ),
+        updatedArmory: consumeFirstLoadedTubeIfAvailable(firingSolution.armory),
         hullDamageTaken: 0,
         isTargetSunk: true,
-        sunkTonnageAwarded: activeEncounter.targetShip.spec.tonnage,
-        tacticalTurnsElapsed: 3,
+        sunkTonnageAwarded: firingSolution.targetShip.spec.tonnage,
+        tacticalTurnsElapsed: 1,
       });
       return;
     }
 
     this.onCompleteEncounter({
-      contactId: activeEncounter.targetShip.contactId,
+      contactId: firingSolution.contactId,
       outcome: 'DISENGAGED',
-      updatedArmory: activeEncounter.submarine.armory,
+      updatedArmory: firingSolution.armory,
       hullDamageTaken: 0,
       isTargetSunk: false,
       sunkTonnageAwarded: 0,
@@ -83,49 +80,54 @@ export class EncounterStubView {
 
   public render(
     context: CanvasRenderingContext2D,
-    encounter: EncounterContext,
+    firingSolution: FiringSolutionContext,
   ): void {
     context.fillStyle = '#040d12';
     context.fillRect(0, 0, 960, 640);
     context.strokeStyle = '#00ffaa';
     context.lineWidth = 2;
-    context.strokeRect(90, 60, 780, 520);
+    context.strokeRect(90, 55, 780, 530);
 
     context.fillStyle = '#00ffaa';
-    context.font = 'bold 18px monospace';
+    context.font = 'bold 17px monospace';
     context.textAlign = 'center';
     context.fillText(
-      'TRANSICIÓN CAPA TÁCTICA // ENCOUNTER CONTEXT CAPTURADO (STUB HITO 1.2)',
+      'VISOR DE PERISCOPIO // FIRING SOLUTION CONTEXT (STUB HITO 1.4)',
       480,
-      108,
+      102,
     );
 
-    const { submarine, targetShip, difficulty } = encounter;
-    const loadedBowCount = submarine.armory.bowTubes.filter(
+    const { targetShip, armory, difficulty } = firingSolution;
+    const loadedBowCount = armory.bowTubes.filter(
       (tube) => tube.status === 'LOADED',
     ).length;
-    const loadedSternCount = submarine.armory.sternTubes.filter(
+    const loadedSternCount = armory.sternTubes.filter(
       (tube) => tube.status === 'LOADED',
     ).length;
+    const sweepDirectionLabel =
+      firingSolution.targetBowSide === 'STARBOARD'
+        ? 'ESTRIBOR (Cruza de Izquierda -> Derecha)'
+        : 'BABOR (Cruza de Derecha -> Izquierda)';
 
     const telemetryLines: readonly string[] = [
-      `CONTACTO OBJETIVO  : ${targetShip.spec.className} [${targetShip.contactId}]`,
-      `TONELAJE Y CALADO  : ${targetShip.spec.tonnage} BRT | Calado: ${targetShip.spec.draftMeters} m`,
-      `VELOCIDAD Y RUMBO  : ${targetShip.speedKnots} nudos | Rumbo axial: ${targetShip.heading}`,
+      `BLANCO FIJADO      : ${targetShip.spec.className} [${firingSolution.contactId}]`,
+      `TONELAJE Y CALADO  : ${targetShip.spec.tonnage} BRT | Calado real: ${targetShip.spec.draftMeters} m`,
       '------------------------------------------------------------------------',
-      `ESTADO SUBMARINO   : Postura ${submarine.stance} (${submarine.depth}) en (${submarine.coordinate.q}, ${submarine.coordinate.r})`,
-      `RECURSOS A BORDO   : Fuel ${submarine.fuel}% | Batería ${submarine.battery}% | Casco ${submarine.hullIntegrity}%`,
-      `ARMERÍA LISTA      : Proa ${loadedBowCount}/4 LOADED | Popa ${loadedSternCount}/1 LOADED | Reserva: ${submarine.armory.reserveTorpedoes}`,
-      `PERFIL DIFICULTAD  : ${difficulty.level} (Recarga: ${difficulty.reloadTurnsRequired} turnos tácticos)`,
+      `DISTANCIA REAL     : ${firingSolution.distanceMeters} metros (${firingSolution.relativeDistanceHexes} hexágonos tácticos)`,
+      `ÁNGULO EN LA PROA  : AOB ${firingSolution.targetAngleOnBowDeg}° por ${sweepDirectionLabel}`,
+      `VELOCIDAD BLANCO   : ${firingSolution.targetSpeedKnots} nudos (Rumbo axial: ${targetShip.heading})`,
+      '------------------------------------------------------------------------',
+      `TUBOS LISTOS       : Proa ${loadedBowCount}/4 LOADED | Popa ${loadedSternCount}/1 LOADED | Reserva: ${armory.reserveTorpedoes}`,
+      `TOLERANCIA TDC     : ±${difficulty.impactAngleToleranceDegrees}° (${difficulty.level}) | Casco: ${firingSolution.hullIntegrityAtPeriscope}%`,
     ];
 
     context.textAlign = 'left';
     context.font = '13px monospace';
-    let lineY = 165;
+    let lineY = 154;
     for (const line of telemetryLines) {
       context.fillStyle = line.startsWith('---') ? '#265c52' : '#c7f9cc';
-      context.fillText(line, 145, lineY);
-      lineY += 34;
+      context.fillText(line, 135, lineY);
+      lineY += 32;
     }
 
     for (const button of STUB_BUTTONS) {
@@ -141,8 +143,8 @@ export class EncounterStubView {
       context.textAlign = 'center';
       context.fillText(
         isSinkButton
-          ? 'HUNDIR MERCANTE (GASTAR 1 TORPEDO)'
-          : 'ROMPER CONTACTO (VOLVER AL MAPA)',
+          ? 'SIMULAR IMPACTO TDC (HUNDIR BLANCO)'
+          : 'ABORTAR ATAQUE (VOLVER AL MAPA)',
         button.x + button.width / 2,
         button.y + 28,
       );

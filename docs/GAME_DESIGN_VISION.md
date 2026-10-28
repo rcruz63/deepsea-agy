@@ -1,18 +1,23 @@
 # VISIÓN GENERAL Y ARQUITECTURA DE DISEÑO: SUBMARINE COMMAND
 
 ## 1. CONCEPTO NUCLEAR
-Juego táctico-arcade de submarinos en 2D con estética instrumental vectorial (cartografía náutica, pantallas de fósforo y siluetas de alto contraste). Combina la tensión posicional de un juego de mesa hexagonal con la habilidad de ejecución en tiempo real en tres minijuegos arcade, evitando tanto la simulación tediosa como el "mata-mata" sin reflexión.
+Juego táctico-arcade de submarinos en 2D con estética instrumental vectorial (cartografía náutica histórica en la capa estratégica y pantallas oscuras de fósforo y siluetas de alto contraste en las capas táctica y arcade). Combina la tensión posicional de un juego de mesa hexagonal con la habilidad de ejecución en tiempo real en tres minijuegos arcade, evitando tanto la simulación tediosa como el "mata-mata" sin reflexión.
 
 ## 2. ARQUITECTURA DE LAS 3 CAPAS (CONTRATOS DESACOPLADOS)
 El juego opera mediante una máquina de estados principal (`GameFlowController`) que coordina tres motores independientes:
 
 1. **Capa Estratégica (`StrategicEngine`):**
-   - Tablero hexagonal a escala oceánica (turnos de 4 horas).
-   - Gestión de ruta, postura (Superficie vs. Sumergido), combustible diésel, baterías eléctricas, integridad del casco y estado de los tubos lanzatorpedos.
+   - Tablero hexagonal a escala oceánica con gestión de ruta, postura (Superficie vs. Sumergido), combustible diésel, baterías eléctricas, integridad del casco y estado de los tubos lanzatorpedos.
    - Niebla de guerra activa: los reportes de radio muestran áreas de probabilidad; el hidrófono traza líneas de dirección de ruido sin revelar la distancia exacta.
+   - **Visión de Interfaz y Navegación Final (Fase 2+):**
+     - **Layout Full-Viewport (`100vw x 100vh`) y HUD Superior Superpuesto:** El lienzo ocupa el 100% de la ventana con cámara desplazable (*pan & zoom*), ubicando los controles de mando, recursos, postura, tubos y radiogramas en una barra superior y cartelas flotantes sobre el mapa.
+     - **Estética de Carta Náutica Histórica y Sistema *Marinequadrat* (`NavalGridSystem`):** Estilo de carta en papel de la *Kriegsmarine* (mar azul cartográfico, costas en tonos tierra, rutas de convoyes discontinuas, rosa de los vientos y puertos históricos como Brest, Saint-Nazaire, Halifax, Liverpool y Gibraltar), reservando el fósforo oscuro para sonar/radar/ASW. Incluye `MarineQuadratMapper` para traducir coordenadas axiales `(q, r)` a cuadrantes navales reales de dos letras (`AD`, `AE`, `AK`, `AL`, `AM`, `BE`, `BF`...) y subcuadrante numérico (`11` a `99`), expresando órdenes y avistamientos como *"Patrullar cuadrante AL 44"* o *"Contacto reportado en AK 63"*.
+     - **Doble Zoom Estratégico y Escala Variable de Consumo:**
+       - *Zoom 1 (Carta Oceánica / Tránsito — Turnos de 24h):* Vista macro del teatro completo para travesías entre la base naval y la zona de patrulla con tabla de consumo oceánico.
+       - *Zoom 2 (Carta de Sector / Patrulla — Turnos de 4h):* Vista detallada del cuadrante (`AL 44`, `AK 63`) para cazar contactos con hidrófono usando la tabla de consumo operacional de 4 horas.
 2. **Capa Táctica (`TacticalEngine`):**
-   - Implementada bajo una interfaz intercambiable (`ITacticalStage`) para permitir el tablero hexagonal local de 15x15 por turnos (implementación principal) o un futuro prototipo de ploteo polar por anillos.
-   - Resuelve la maniobra de aproximación al convoy: posición relativa, velocidad vs. cavitación, profundidad y evasión de los conos de Radar y ASDIC de los escoltas antes de entrar en posición de disparo.
+   - Implementada bajo una interfaz intercambiable (`ITacticalStage`) para permitir el tablero hexagonal local de 15x15 por turnos de 5 minutos (implementación principal) o un futuro prototipo de ploteo polar por anillos.
+   - Resuelve la maniobra de aproximación al convoy: posición relativa, velocidad vs. cavitación, profundidad (`SURFACED`, `PERISCOPE_DEPTH`, `DEEP`) y evasión de los conos de Radar y ASDIC de los escoltas antes de entrar en posición de disparo.
 3. **Capa de Acción Arcade (`ArcadeEngine`):**
    - Tres módulos de acción en tiempo real independientes según el desencadenante:
      - **Módulo A (Ataque con Torpedos):** Vista de periscopio y TDC simplificado. Requiere identificar silueta en manual (calado), elegir espoleta (impacto vs. magnética), alinear ángulo en la proa (AOB) y estimar velocidad antes de que la escolta detecte el periscopio.
@@ -39,7 +44,7 @@ Todas las fórmulas leen de un objeto de configuración de dificultad:
 
 ## 4. ROADMAP COMPLETO DEL PROYECTO (6 FASES)
 - **FASE 1:** Esqueleto de 3 capas, mapa hexagonal básico, aproximación táctica 15x15 y ataque arcade con torpedos a mercante solitario (con gestión de tubos y dificultad).
-- **FASE 2:** Hidrófono estratégico, contactos por radio con deriva aleatoria, ciclo día/noche, clima, combustible/baterías y ciclo de patrulla a base.
+- **FASE 2:** Carta náutica histórica *Marinequadrat* (`MarineQuadratMapper`) a pantalla completa (`100vw x 100vh`) con cámara *pan & zoom*, HUD superior superpuesto, doble escala de zoom (`24h` tránsito oceánico / `4h` patrulla de sector), hidrófono estratégico, contactos por radio con deriva aleatoria, ciclo día/noche, clima y ciclo completo de patrulla a base.
 - **FASE 3:** Escoltas en tablero táctico, IA de patrulla, conos de Radar y ASDIC, detección por cavitación y ruido de recarga.
 - **FASE 4:** Modo Arcade Antisubmarino (ASW) completo: cargas de profundidad, termoclina, barrido ASDIC activo y daños por inundación.
 - **FASE 5:** Modo Arcade de Ataque Aéreo (*Crash Dive*) y sistema de eventos aleatorios en campaña.

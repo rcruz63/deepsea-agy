@@ -1,51 +1,35 @@
 # REGLAS MECÁNICAS CERRADAS: SUBMARINE COMMAND
 
-Este documento consolida las fórmulas matemáticas y reglas de negocio cerradas que ya han sido implementadas y verificadas mediante tests unitarios.
+Este documento consolida las fórmulas matemáticas y reglas de negocio cerradas del proyecto.
 
 ---
 
 ## 1. Geometría y Métrica Hexagonal (`src/core/hex/`)
 
 ### 1.1. Coordenadas Axiales e Invariante Cúbico
-- Cada celda se identifica mediante coordenadas axiales enteras `(q, r)`.
-- La tercera coordenada cúbica se deriva implícitamente como `s = -q - r`, garantizando el invariante `q + r + s = 0`.
-- La clave canónica de indexación en `Map<HexKey, TCell>` tiene siempre el formato exacto `"q,r"` (con normalización de `-0` a `0` para evitar colisiones de clave en JavaScript).
+- Cada celda se identifica mediante coordenadas axiales enteras `(q, r)` con coordenada cúbica implícita `s = -q - r` (`q + r + s = 0`).
+- La clave canónica en `Map<HexKey, TCell>` tiene siempre el formato `"q,r"` (normalizando `-0` a `0`).
 
 ### 1.2. Vectores de Dirección (`POINTY_TOP`)
-En orientación `POINTY_TOP`, los seis rumbos discretos en sentido horario son:
-- `0` (`EAST`): `(+1, 0)`
-- `1` (`SOUTHEAST`): `(0, +1)`
-- `2` (`SOUTHWEST`): `(-1, +1)`
-- `3` (`WEST`): `(-1, 0)`
-- `4` (`NORTHWEST`): `(0, -1)`
-- `5` (`NORTHEAST`): `(+1, -1)`
+En sentido horario: `0` (`+1, 0` Este), `1` (`0, +1` Sureste), `2` (`-1, +1` Suroeste), `3` (`-1, 0` Oeste), `4` (`0, -1` Noroeste), `5` (`+1, -1` Noreste).
 
-### 1.3. Distancia Hexagonal Exacta
-La distancia mínima en pasos entre `origin(q1, r1)` y `destination(q2, r2)` equivale a la semidistancia de Manhattan en el espacio cúbico:
-- `dq = q2 - q1`
-- `dr = r2 - r1`
-- `distance = (|dq| + |dq + dr| + |dr|) / 2`
-
-### 1.4. Proyección Cartesiana 2D y Redondeo Cúbico
-- **Orientación `POINTY_TOP` de radio `size`:**
-  - `x = size * sqrt(3) * (q + r / 2)`
-  - `y = size * (3 / 2) * r`
-- **Redondeo fraccional:** Al convertir coordenadas cartesianas continuas a axiales fraccionales, se redondean `(q, r, s)` al entero más cercano y se reajusta la componente con mayor desviación absoluta para preservar `q + r + s = 0`.
+### 1.3. Distancia Hexagonal y Proyección 2D
+- **Distancia exacta `O(1)`:** `distance = (|dq| + |dq + dr| + |dr|) / 2`.
+- **Proyección `POINTY_TOP` de radio `size`:** `x = size * sqrt(3) * (q + r / 2)`, `y = size * (3 / 2) * r`.
+- **Demora náutica (`calculateNavalBearingDegrees`):** `0°` al Norte (`-Y`), sentido horario (`90°` Este, `180°` Sur, `270°` Oeste).
 
 ---
 
 ## 2. Sistema de Torpedos y Armería (`src/core/armory/`)
 
 ### 2.1. Máquina de Estados de Tubo Individual
-Cada tubo (`BOW` o `STERN`) transita exclusivamente según las siguientes reglas:
 - `LOADED -> EMPTY`: Al disparar el tubo (`remainingReloadTurns = 0`, `isReloadPaused = false`).
-- `EMPTY -> RELOADING`: Al ordenar recarga si existen reservas disponibles (o si `hasInfiniteReserveTorpedoes === true`). Asigna `remainingReloadTurns = reloadTurnsRequired`.
-- `RELOADING -> RELOADING | LOADED`: Al avanzar un turno, si `isReloadPaused === false`, decrementa `remainingReloadTurns` en `1`. Al llegar a `0`, pasa a `LOADED`.
-- `ANY -> DAMAGED`: Un impacto deja el tubo inoperativo (`remainingReloadTurns = 0`, `isReloadPaused = false`), bloqueando disparo y recarga hasta reparación en base.
+- `EMPTY -> RELOADING`: Al ordenar recarga si existen reservas (o `hasInfiniteReserveTorpedoes === true`), asignando `remainingReloadTurns = reloadTurnsRequired`.
+- `RELOADING -> RELOADING | LOADED`: Al avanzar un turno táctico, si `isReloadPaused === false`, decrementa `remainingReloadTurns` en `1` hasta llegar a `0` (`LOADED`).
+- `ANY -> DAMAGED`: Inutiliza el tubo hasta reparación en base.
 
 ### 2.2. Ruido Mecánico de Recarga
-- Las maniobras de estiba y arrastre de torpedos generan ruido mecánico detectable por escoltas.
-- Si al menos un tubo está en `RELOADING` con `isReloadPaused === false`, el submarino recibe la penalización acústica `reloadAcousticPenalty` definida en `DifficultyConfig`. Si todos los tubos en recarga están pausados (`isReloadPaused === true`), la penalización de recarga cae a `0`.
+- Si al menos un tubo está en `RELOADING` con `isReloadPaused === false`, genera la penalización acústica `reloadAcousticPenalty` del `DifficultyConfig`.
 
 ---
 
@@ -65,26 +49,46 @@ Cada tubo (`BOW` o `STERN`) transita exclusivamente según las siguientes reglas
 
 ## 4. Capa Estratégica: Patrulla Oceánica (`src/layers/strategic/`)
 
-### 4.1. Escala de Recursos (`fuel` y `battery`)
-- Tanto el combustible diésel (`fuel`) como la carga de baterías eléctricas (`battery`) están acotados en el rango `[0, 100]`.
-
-### 4.2. Movimiento y Balance Energético por Turno (4 Horas)
-Solo son transitables las celdas de agua (`DEEP_WATER`, `COASTAL_WATER`) y bases navales (`NAVAL_BASE`); la costa (`LAND`) es intransitable.
+### 4.1. Balance Energético por Turno Operacional (4 Horas — Fase 1)
+Recursos `fuel` y `battery` acotados en `[0, 100]`. La costa (`LAND`) es intransitable.
 
 | Postura | Distancia (Hex) | Variación de `fuel` | Variación de `battery` | Notas de Regla |
 | :--- | :---: | :---: | :---: | :--- |
-| `SURFACED` | `0` | `-1` | `+30` (máx. `100`) | Patrulla estacionaria y carga rápida con generadores diésel. |
+| `SURFACED` | `0` | `-1` | `+30` (máx. `100`) | Patrulla estacionaria y carga rápida diésel. |
 | `SURFACED` | `1` | `-2` | `+20` (máx. `100`) | Crucero económico de superficie. |
-| `SURFACED` | `2` | `-5` | `+10` (máx. `100`) | Forzar máquinas; penaliza consumo diésel y reduce margen de carga. |
+| `SURFACED` | `2` | `-5` | `+10` (máx. `100`) | Forzar máquinas en superficie. |
 | `SUBMERGED` | `0` | `0` | `-5` (mín. `0`) | Acecho silencioso sumergido. |
-| `SUBMERGED` | `1` | `0` | `-15` (mín. `0`) | Tránsito sumergido con motores eléctricos (alcance máximo: `1` hex). |
+| `SUBMERGED` | `1` | `0` | `-15` (mín. `0`) | Tránsito sumergido (alcance máximo: `1` hex). |
 
-- **Superficie forzada por batería agotada:** Si al cierre del movimiento o turno `battery` llega a `0`, el submarino pasa automáticamente a postura `SURFACED` (`depth = 'SURFACED'`).
-- **Restricción por combustible:** En postura `SURFACED`, un alcance de `1` o `2` hexágonos solo es seleccionable si el submarino dispone de `fuel` suficiente para cubrir su coste (`>= 2` o `>= 5` respectivamente). En `SUBMERGED`, mover `1` hexágono requiere `battery >= 15` (o al agotarse a `0` fuerza salida a superficie al final del turno).
+- **Emersión forzada:** Si `battery === 0` al cerrar el turno, el submarino pasa automáticamente a `SURFACED`.
+- **Recarga de torpedos en 4h:** Un turno estratégico completa todos los ticks de recarga de los tubos en `RELOADING` no pausados.
+- **Intercepción (`EncounterContext`):** Habilitada cuando `calculateHexDistance(sub, merchant) <= 1`.
 
-### 4.3. Recarga de Torpedos en Escala Estratégica
-- Dado que un turno estratégico representa **4 horas**, al avanzar un turno estratégico se ejecutan suficientes ticks de recarga sobre `TorpedoArmory` para que todo tubo en estado `RELOADING` con `isReloadPaused === false` complete su ciclo y pase a `LOADED`.
+### 4.2. Especificación de Evolución Estratégica para Fase 2 (Cerrada en Diseño)
+1. **Viewport Completo (`100vw x 100vh`) y HUD Superior:** Lienzo a pantalla completa con cámara *pan & zoom*, barra de mando superior y cartelas flotantes sobre la carta.
+2. **Estética Cartográfica y *Marinequadrat* (`NavalGridSystem`):** Estilo en papel de la *Kriegsmarine* con puertos históricos (Brest, Saint-Nazaire, Halifax, Liverpool, Gibraltar) y `MarineQuadratMapper` para traducir `(q, r)` a nomenclatura naval alemana (`AD`, `AE`, `AK`, `AL`, `AM`, `BE`, `BF` + subcuadrante `11..99`, ej. `AL 44`, `AK 63`).
+3. **Doble Zoom y Consumo Variable:** Zoom 1 (*Carta Oceánica / Tránsito*, turnos de `24h` con tabla de consumo de crucero oceánico) y Zoom 2 (*Carta de Sector / Patrulla*, turnos de `4h` con tabla operacional e hidrófono).
 
-### 4.4. Escenario Atlántico (`12x8`), Ruta Mercante e Intercepción
-- El mapa estratégico inicial de `12x8` hexágonos contiene mar abierto, una franja costera intransitable (`LAND`), una base naval de salida (`NAVAL_BASE`) y al menos un buque mercante móvil que avanza `1` hexágono por turno siguiendo su ruta de tránsito.
-- **Disparo de Intercepción (`EncounterContext`):** Cuando al término del movimiento del submarino o del avance del mercante ambos se encuentran en el mismo hexágono o en hexágonos adyacentes (`calculateHexDistance <= 1`), el motor estratégico habilita la intercepción y construye un `EncounterContext` inmutable para `GameFlowController`.
+---
+
+## 5. Capa Táctica: Aproximación 15x15 (`src/layers/tactical/`) — Turnos de 5 Minutos
+
+### 5.1. Escala del Tablero y Avance del Contacto
+- Tablero hexagonal local de `15x15` celdas donde **`1 hexágono = 500 metros`** y **`1 turno = 5 minutos`**.
+- El mercante inicia en la zona central y avanza `1` hexágono por turno siguiendo su vector de rumbo (`heading`).
+- Cada turno táctico avanza **`1 tick`** en la recarga de `TorpedoArmory` (`advanceArmoryReloadTurn`).
+
+### 5.2. Cotas Tácticas (`TacticalDepth`), Velocidad y Consumo por Turno (5m)
+
+| Cota Táctica | Alcance (Hex) | Coste `fuel` | Coste `battery` | Regla Operativa |
+| :--- | :---: | :---: | :---: | :--- |
+| `SURFACED` | `0..3` | `0 hex: 0` \| `1-2 hex: -1` \| `3 hex: -2` | `0` | Permite flanqueo rápido y disparo en superficie. |
+| `PERISCOPE_DEPTH` | `0..2` | `0` | `0 hex: 0` \| `1 hex: -1` \| `2 hex: -3` | Cota estándar de ataque; habilita el periscopio. |
+| `DEEP` | `0..1` | `0` | `0 hex: 0` \| `1 hex: -1` | Navegación profunda; **bloquea** el periscopio. |
+
+- Si `battery` cae a `0` en `PERISCOPE_DEPTH` o `DEEP`, el submarino es forzado automáticamente a `SURFACED`.
+
+### 5.3. Ventana de Disparo y Geometría del `FiringSolutionContext`
+- **Condición de disparo:** Cota `PERISCOPE_DEPTH` o `SURFACED`, al menos un tubo en estado `LOADED`, y distancia axial al mercante entre **`1` y `4` hexágonos** (`500m <= distanceMeters <= 2000m`).
+- **Distancia en metros (`distanceMeters`):** `relativeDistanceHexes * 500`.
+- **Ángulo en la Proa (`targetAngleOnBowDeg`):** Ángulo absoluto en `[0°, 180°]` entre el rumbo de proa del mercante y la demora náutica desde el mercante hacia el submarino (`0°` = proa pura, `90°` = través perpendicular óptimo, `180°` = popa).
