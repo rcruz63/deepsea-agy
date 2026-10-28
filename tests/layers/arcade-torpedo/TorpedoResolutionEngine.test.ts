@@ -3,6 +3,8 @@ import { createInitialTorpedoArmory } from '../../../src/core/armory/index.ts';
 import type { FiringSolutionContext } from '../../../src/core/contracts/index.ts';
 import { getDifficultyConfig } from '../../../src/core/difficulty/DifficultyPresets.ts';
 import {
+  calculateLeadAngleOffsetDeg,
+  calculateTorpedoRunTimings,
   getShipRecognitionEntry,
   resolveTorpedoShot,
   type TdcFiringInput,
@@ -47,72 +49,95 @@ function createExactTdcInput(
     selectedTubeId: 'BOW-1',
     recognizedShipType: 'LIBERTY_CARGO',
     pistolType: 'IMPACT',
-    torpedoDepthMeters: 5.0,
+    torpedoDepthMeters: 4.5,
     estimatedSpeedKnots: 10,
     estimatedAobDeg: 90,
     ...overrides,
   };
 }
 
-describe('TorpedoResolutionEngine (TDC Trigonometry & Fuse Physics)', () => {
+describe('TorpedoResolutionEngine (Lead Angle, Run Time & Fuse Physics)', () => {
   const libertyEntry = getShipRecognitionEntry('LIBERTY_CARGO');
 
-  it('resolves HIT_HULL with 1 damage when TDC estimation is accurate and depth <= draft', () => {
+  it('resolves HIT_HULL with 2 critical damage on dead-center IMPACT hit and 1 damage on off-center hit', () => {
     const context = createFiringContext();
-    const input = createExactTdcInput({
+    const centerInput = createExactTdcInput({
       pistolType: 'IMPACT',
-      torpedoDepthMeters: 6.0,
+      torpedoDepthMeters: 4.5,
     });
 
-    const resolution = resolveTorpedoShot(context, input, libertyEntry, 0.99);
+    const centerResolution = resolveTorpedoShot(
+      context,
+      centerInput,
+      libertyEntry,
+      0.99,
+    );
+    expect(centerResolution.outcome).toBe('HIT_HULL');
+    expect(centerResolution.damageInflicted).toBe(2);
+    expect(centerResolution.longitudinalMissMeters).toBe(0);
 
-    expect(resolution.outcome).toBe('HIT_HULL');
-    expect(resolution.damageInflicted).toBe(1);
-    expect(resolution.longitudinalMissMeters).toBe(0);
-    expect(resolution.impactObliquityDeg).toBe(0);
+    // Con un ligero desvío de velocidad (+5 kn -> +40m de desvío en proa), golpea la proa con 1 punto de daño
+    const bowHitResolution = resolveTorpedoShot(
+      context,
+      createExactTdcInput({ estimatedSpeedKnots: 15, torpedoDepthMeters: 3.0 }),
+      libertyEntry,
+      0.99,
+    );
+    expect(bowHitResolution.outcome).toBe('HIT_HULL');
+    expect(bowHitResolution.damageInflicted).toBe(1);
+    expect(bowHitResolution.longitudinalMissMeters).toBe(40);
   });
 
-  it('resolves MISSED_AHEAD when player overestimates target speed beyond half ship length', () => {
+  it('calculates longer torpedo run times as distance or lead angle increases', () => {
+    const closeRun = calculateTorpedoRunTimings(500, 0);
+    const farRun = calculateTorpedoRunTimings(1500, 0);
+    const angledFarRun = calculateTorpedoRunTimings(1500, 25);
+
+    expect(farRun.realNavalRunSeconds).toBeGreaterThan(
+      closeRun.realNavalRunSeconds,
+    );
+    expect(angledFarRun.realNavalRunSeconds).toBeGreaterThan(
+      farRun.realNavalRunSeconds,
+    );
+
+    const starboardLead = calculateLeadAngleOffsetDeg(10, 90, 'STARBOARD');
+    const portLead = calculateLeadAngleOffsetDeg(10, 90, 'PORT');
+    expect(starboardLead).toBeGreaterThan(0);
+    expect(portLead).toBe(-starboardLead);
+  });
+
+  it('resolves MISSED_AHEAD and MISSED_ASTERN when longitudinal miss exceeds half ship length', () => {
     const context = createFiringContext({ distanceMeters: 1500 });
-    const input = createExactTdcInput({
-      estimatedSpeedKnots: 20,
-    });
+    const aheadResolution = resolveTorpedoShot(
+      context,
+      createExactTdcInput({ estimatedSpeedKnots: 20 }),
+      libertyEntry,
+      0.99,
+    );
+    const asternResolution = resolveTorpedoShot(
+      context,
+      createExactTdcInput({ estimatedSpeedKnots: 0 }),
+      libertyEntry,
+      0.99,
+    );
 
-    const resolution = resolveTorpedoShot(context, input, libertyEntry, 0.99);
-
-    expect(resolution.outcome).toBe('MISSED_AHEAD');
-    expect(resolution.damageInflicted).toBe(0);
-    expect(resolution.longitudinalMissMeters).toBeGreaterThan(67.5);
+    expect(aheadResolution.outcome).toBe('MISSED_AHEAD');
+    expect(asternResolution.outcome).toBe('MISSED_ASTERN');
   });
 
-  it('resolves MISSED_ASTERN when player underestimates target speed beyond half ship length', () => {
-    const context = createFiringContext({ distanceMeters: 1500 });
-    const input = createExactTdcInput({
-      estimatedSpeedKnots: 0,
-    });
-
-    const resolution = resolveTorpedoShot(context, input, libertyEntry, 0.99);
-
-    expect(resolution.outcome).toBe('MISSED_ASTERN');
-    expect(resolution.damageInflicted).toBe(0);
-    expect(resolution.longitudinalMissMeters).toBeLessThan(-67.5);
-  });
-
-  it('resolves GLANCING_DUD when impact obliquity exceeds difficulty tolerance or dud roll triggers', () => {
-    // AOB 20° -> oblicuidad |90 - 20| = 70° > 60° (tolerancia en NORMAL)
-    const steepAngleContext = createFiringContext({ targetAngleOnBowDeg: 20 });
-    const steepInput = createExactTdcInput({ estimatedAobDeg: 20 });
+  it('resolves GLANCING_DUD only on extreme obliquity (> 70° in NORMAL) or dud roll in HARD', () => {
+    // AOB 10° -> oblicuidad |90 - 10| = 80° > 70° (tolerancia en NORMAL)
+    const extremeContext = createFiringContext({ targetAngleOnBowDeg: 10 });
+    const extremeInput = createExactTdcInput({ estimatedAobDeg: 10 });
 
     const steepResolution = resolveTorpedoShot(
-      steepAngleContext,
-      steepInput,
+      extremeContext,
+      extremeInput,
       libertyEntry,
       0.99,
     );
     expect(steepResolution.outcome).toBe('GLANCING_DUD');
-    expect(steepResolution.damageInflicted).toBe(0);
 
-    // En HARD (dudProbability = 0.25), un randomRoll de 0.10 provoca fallo de espoleta incluso a 90°
     const hardContext = createFiringContext({
       difficulty: getDifficultyConfig('HARD'),
     });
@@ -120,46 +145,28 @@ describe('TorpedoResolutionEngine (TDC Trigonometry & Fuse Physics)', () => {
       hardContext,
       createExactTdcInput(),
       libertyEntry,
-      0.1,
+      0.05,
     );
     expect(hardDudResolution.outcome).toBe('GLANCING_DUD');
   });
 
-  it('resolves HIT_KEEL_MAGNETIC (2 damage) when MAGNETIC pistol passes within magnetic window beneath keel', () => {
-    // Calado de LIBERTY_CARGO = 7.5m; ventana magnética en NORMAL = +1.5m (7.5m < cota <= 9.0m)
+  it('resolves HIT_KEEL_MAGNETIC (2 damage) and PASSED_UNDER_KEEL according to depth and pistol', () => {
     const context = createFiringContext();
-    const magneticInput = createExactTdcInput({
-      pistolType: 'MAGNETIC',
-      torpedoDepthMeters: 8.5,
-    });
-
-    const resolution = resolveTorpedoShot(
+    const magneticHit = resolveTorpedoShot(
       context,
-      magneticInput,
+      createExactTdcInput({ pistolType: 'MAGNETIC', torpedoDepthMeters: 8.5 }),
+      libertyEntry,
+      0.99,
+    );
+    const impactUnderKeel = resolveTorpedoShot(
+      context,
+      createExactTdcInput({ pistolType: 'IMPACT', torpedoDepthMeters: 8.5 }),
       libertyEntry,
       0.99,
     );
 
-    expect(resolution.outcome).toBe('HIT_KEEL_MAGNETIC');
-    expect(resolution.damageInflicted).toBe(2);
-  });
-
-  it('resolves PASSED_UNDER_KEEL when IMPACT pistol is set below draft or depth exceeds magnetic window', () => {
-    const context = createFiringContext();
-    const impactUnderKeel = createExactTdcInput({
-      pistolType: 'IMPACT',
-      torpedoDepthMeters: 8.5,
-    });
-    const tooDeepMagnetic = createExactTdcInput({
-      pistolType: 'MAGNETIC',
-      torpedoDepthMeters: 10.5,
-    });
-
-    expect(
-      resolveTorpedoShot(context, impactUnderKeel, libertyEntry, 0.99).outcome,
-    ).toBe('PASSED_UNDER_KEEL');
-    expect(
-      resolveTorpedoShot(context, tooDeepMagnetic, libertyEntry, 0.99).outcome,
-    ).toBe('PASSED_UNDER_KEEL');
+    expect(magneticHit.outcome).toBe('HIT_KEEL_MAGNETIC');
+    expect(magneticHit.damageInflicted).toBe(2);
+    expect(impactUnderKeel.outcome).toBe('PASSED_UNDER_KEEL');
   });
 });

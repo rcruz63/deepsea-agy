@@ -3,13 +3,21 @@ import type { Point2D } from '../../../core/hex/index.ts';
 import type { RecognizedShipClass } from '../domain/ShipRecognitionManual.ts';
 import type { TorpedoArcadeEngine } from '../domain/TorpedoArcadeEngine.ts';
 import type { TorpedoPistolType } from '../domain/TorpedoTypes.ts';
-import { renderPeriscopeLensView } from './PeriscopeLensRenderer.ts';
+import {
+  PERISCOPE_LENS_CENTER_Y,
+  PERISCOPE_LENS_RADIUS,
+  renderPeriscopeLensView,
+} from './PeriscopeLensRenderer.ts';
+import {
+  PERISCOPE_LENS_CENTER_X,
+  PIXELS_PER_BEARING_DEGREE,
+} from './PeriscopeTargetRenderer.ts';
 import {
   type TdcControlRegion,
   renderTdcControlPanel,
 } from './TdcControlPanelRenderer.ts';
 
-// Coordina la vista de periscopio y consola TDC, despachando ajustes de puntería, disparos y retorno a patrulla
+// Coordina la vista del periscopio en tiempo real: bucle de animación, giro por lente/teclado y carrera del torpedo
 
 function isPointInsideRegion(point: Point2D, region: TdcControlRegion): boolean {
   return (
@@ -20,98 +28,157 @@ function isPointInsideRegion(point: Point2D, region: TdcControlRegion): boolean 
   );
 }
 
+function isPointInsidePeriscopeLens(point: Point2D): boolean {
+  const dx = point.x - PERISCOPE_LENS_CENTER_X;
+  const dy = point.y - PERISCOPE_LENS_CENTER_Y;
+  return dx * dx + dy * dy <= PERISCOPE_LENS_RADIUS * PERISCOPE_LENS_RADIUS;
+}
+
 export class TorpedoArcadeStageView {
   private readonly engine: TorpedoArcadeEngine;
   private readonly onCompleteEncounter: (result: EncounterResult) => void;
+  private readonly onRequestRedraw: (() => void) | undefined;
   private lastControlRegions: readonly TdcControlRegion[] = [];
-  private torpedoRunProgress: number | null = null;
+  private animationFrameId: number | null = null;
+  private lastTimestampMs: number | null = null;
 
   public constructor(
     engine: TorpedoArcadeEngine,
     onCompleteEncounter: (result: EncounterResult) => void,
+    onRequestRedraw?: () => void,
   ) {
     this.engine = engine;
     this.onCompleteEncounter = onCompleteEncounter;
+    this.onRequestRedraw = onRequestRedraw;
+    this.bindKeyboardShortcuts();
+  }
+
+  private bindKeyboardShortcuts(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    window.addEventListener('keydown', (event: KeyboardEvent) => {
+      if (this.animationFrameId === null) {
+        return;
+      }
+      if (event.key === 'ArrowLeft' || event.key === 'a' || event.key === 'A') {
+        this.engine.rotatePeriscope(-1.5);
+        this.onRequestRedraw?.();
+      } else if (event.key === 'ArrowRight' || event.key === 'd' || event.key === 'D') {
+        this.engine.rotatePeriscope(1.5);
+        this.onRequestRedraw?.();
+      } else if (event.key === ' ') {
+        event.preventDefault();
+        this.engine.launchTorpedoRun();
+        this.onRequestRedraw?.();
+      }
+    });
+  }
+
+  private ensureSimulationLoopRunning(): void {
+    if (this.animationFrameId !== null || typeof window === 'undefined') {
+      return;
+    }
+    this.lastTimestampMs = performance.now();
+    const tick = (nowMs: number): void => {
+      const previousMs = this.lastTimestampMs ?? nowMs;
+      const deltaSeconds = Math.min(0.1, Math.max(0, (nowMs - previousMs) / 1000));
+      this.lastTimestampMs = nowMs;
+      this.engine.stepSimulation(deltaSeconds);
+      this.onRequestRedraw?.();
+      if (this.animationFrameId !== null) {
+        this.animationFrameId = window.requestAnimationFrame(tick);
+      }
+    };
+    this.animationFrameId = window.requestAnimationFrame(tick);
+  }
+
+  private stopSimulationLoop(): void {
+    if (this.animationFrameId !== null && typeof window !== 'undefined') {
+      window.cancelAnimationFrame(this.animationFrameId);
+    }
+    this.animationFrameId = null;
+    this.lastTimestampMs = null;
   }
 
   public handlePointerClick(canvasPoint: Point2D): void {
+    // Hacer clic dentro de la lente gira el periscopio directamente hacia el punto clicado para adelantar el tiro
+    if (isPointInsidePeriscopeLens(canvasPoint)) {
+      const currentBearing = this.engine.getSnapshot().periscopeBearingDeg;
+      const deltaDeg = (canvasPoint.x - PERISCOPE_LENS_CENTER_X) / PIXELS_PER_BEARING_DEGREE;
+      this.engine.setPeriscopeBearing(currentBearing + deltaDeg);
+      return;
+    }
+
     const clickedRegion = this.lastControlRegions.find(
       (region) => region.isEnabled && isPointInsideRegion(canvasPoint, region),
     );
-    if (clickedRegion === undefined) {
-      return;
+    if (clickedRegion !== undefined) {
+      this.executeControlAction(clickedRegion.actionId);
     }
-    this.executeControlAction(clickedRegion.actionId);
   }
 
   private executeControlAction(actionId: string): void {
-    const currentInput = this.engine.getSnapshot().currentInput;
+    const snapshot = this.engine.getSnapshot();
+    const currentInput = snapshot.currentInput;
 
-    if (actionId.startsWith('SET_CLASS:')) {
-      const recognizedShipType = actionId.slice(
-        'SET_CLASS:'.length,
-      ) as RecognizedShipClass;
-      this.engine.updateTdcInput({ recognizedShipType });
+    if (actionId.startsWith('ROTATE_PERISCOPE:')) {
+      this.engine.rotatePeriscope(Number(actionId.slice('ROTATE_PERISCOPE:'.length)));
       return;
     }
-
+    if (actionId === 'SYNC_TDC_LEAD') {
+      this.engine.setPeriscopeBearing(snapshot.tdcSuggestedBearingDeg);
+      return;
+    }
+    if (actionId.startsWith('SET_CLASS:')) {
+      const recognizedShipType = actionId.slice('SET_CLASS:'.length) as RecognizedShipClass;
+      const entry = this.engine.updateTdcInput({ recognizedShipType }).recognizedManualEntry;
+      // Ajusta una cota segura sugerida según la clase consultada en el manual para facilitar el disparo
+      const suggestedDepth = currentInput.pistolType === 'MAGNETIC' ? entry.draftMeters + 1.0 : Math.max(2.0, entry.draftMeters - 1.5);
+      this.engine.updateTdcInput({ torpedoDepthMeters: suggestedDepth });
+      return;
+    }
     if (actionId.startsWith('SET_PISTOL:')) {
       const pistolType = actionId.slice('SET_PISTOL:'.length) as TorpedoPistolType;
-      this.engine.updateTdcInput({ pistolType });
+      const draft = snapshot.recognizedManualEntry.draftMeters;
+      const suggestedDepth = pistolType === 'MAGNETIC' ? draft + 1.0 : Math.max(2.0, draft - 1.5);
+      this.engine.updateTdcInput({ pistolType, torpedoDepthMeters: suggestedDepth });
       return;
     }
-
     if (actionId.startsWith('STEP_DEPTH:')) {
-      const delta = Number(actionId.slice('STEP_DEPTH:'.length));
-      this.engine.updateTdcInput({
-        torpedoDepthMeters: currentInput.torpedoDepthMeters + delta,
-      });
+      this.engine.updateTdcInput({ torpedoDepthMeters: currentInput.torpedoDepthMeters + Number(actionId.slice('STEP_DEPTH:'.length)) });
       return;
     }
-
     if (actionId.startsWith('STEP_SPEED:')) {
-      const delta = Number(actionId.slice('STEP_SPEED:'.length));
-      this.engine.updateTdcInput({
-        estimatedSpeedKnots: currentInput.estimatedSpeedKnots + delta,
-      });
+      this.engine.updateTdcInput({ estimatedSpeedKnots: currentInput.estimatedSpeedKnots + Number(actionId.slice('STEP_SPEED:'.length)) });
       return;
     }
-
     if (actionId.startsWith('STEP_AOB:')) {
-      const delta = Number(actionId.slice('STEP_AOB:'.length));
-      this.engine.updateTdcInput({
-        estimatedAobDeg: currentInput.estimatedAobDeg + delta,
-      });
+      this.engine.updateTdcInput({ estimatedAobDeg: currentInput.estimatedAobDeg + Number(actionId.slice('STEP_AOB:'.length)) });
       return;
     }
-
     if (actionId.startsWith('SELECT_TUBE:')) {
-      const selectedTubeId = actionId.slice('SELECT_TUBE:'.length);
-      this.engine.updateTdcInput({ selectedTubeId });
+      this.engine.updateTdcInput({ selectedTubeId: actionId.slice('SELECT_TUBE:'.length) });
       return;
     }
-
     if (actionId === 'FIRE_TORPEDO') {
-      this.torpedoRunProgress = 1;
-      this.engine.fireSelectedTorpedo();
+      this.engine.launchTorpedoRun();
       return;
     }
-
     if (actionId === 'ADVANCE_RELOAD_TICK') {
-      this.torpedoRunProgress = null;
       this.engine.advanceFiveMinuteReloadTick();
       return;
     }
-
     if (actionId === 'EXIT_PERISCOPE') {
-      this.torpedoRunProgress = null;
+      this.stopSimulationLoop();
       this.onCompleteEncounter(this.engine.buildEncounterResult());
     }
   }
 
   public render(context: CanvasRenderingContext2D): void {
+    this.ensureSimulationLoopRunning();
     const snapshot = this.engine.getSnapshot();
-    renderPeriscopeLensView(context, snapshot, this.torpedoRunProgress);
+    renderPeriscopeLensView(context, snapshot);
     this.lastControlRegions = renderTdcControlPanel(context, snapshot);
   }
 }

@@ -61,6 +61,7 @@ export function bootstrapApplicationShell(): HTMLCanvasElement | null {
       flowController.completeEncounter(encounterResult);
       renderActiveFrame();
     },
+    renderActiveFrame,
   );
 
   canvasElement.addEventListener('mousemove', (event: MouseEvent) => {

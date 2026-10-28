@@ -72,8 +72,8 @@ flowchart TD
 │   │   │   ├── domain/                   # Cotas, alcance 0..3 hex, geometría AOB/banda y HexTacticalEngine
 │   │   │   └── view/                     # Plotter 15x15, anillo de tiro 1..4 hex, HUD y periscopio
 │   │   └── arcade-torpedo/               # Capa Arcade Módulo A: Periscopio y TDC (Hito 1.4 completado)
-│   │       ├── domain/                   # ShipRecognitionManual, TorpedoTypes, TorpedoResolutionEngine y TorpedoArcadeEngine
-│   │       └── view/                     # PeriscopeLensRenderer (sin spoilers), TdcControlPanelRenderer y TorpedoArcadeStageView
+│   │       ├── domain/                   # ShipRecognitionManual, PeriscopeKinematics, TorpedoResolutionEngine y TorpedoArcadeEngine
+│   │       └── view/                     # PeriscopeTargetRenderer, PeriscopeLensRenderer, TdcControlPanelRenderer y TorpedoArcadeStageView
 │   ├── flow/                             # GameFlowController y GameFlowState (Ciclo 3 capas cerrado)
 │   └── main.ts                           # Arranque Canvas 2D conectado a las 3 capas vía GameFlowController
 └── tests/

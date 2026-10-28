@@ -78,11 +78,12 @@ export class HexTacticalEngine
       hullIntegrity: context.submarine.hullIntegrity,
       armory: context.submarine.armory,
     };
+    // El corredor táctico local orienta siempre el tránsito mercante hacia el Este (0) para evitar emboscadas de popa pura (AOB 180°) desde (4,11)
     this.merchant = {
       contactId: context.targetShip.contactId,
       spec: context.targetShip.spec,
       coordinate: this.customMerchantCoordinate ?? INITIAL_TACTICAL_MERCHANT_COORDINATE,
-      heading: context.targetShip.heading,
+      heading: 0,
       speedKnots: context.targetShip.speedKnots,
     };
     this.resolution = { status: 'IN_PROGRESS' };

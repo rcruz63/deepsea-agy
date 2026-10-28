@@ -8,6 +8,11 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
 ## [Unreleased]
 
 ### Added
+- **Mejora Jugable y Visual del Periscopio (`src/layers/arcade-torpedo/`):**
+  - Giro interactivo del periscopio (`PeriscopeKinematics.ts`) mediante teclado (`A`/`D` o `◄`/`►`), clic directo sobre la lente o consola TDC para adelantar el disparo (*lead angle*) frente al avance lateral en tiempo real del mercante.
+  - Carrera animada del torpedo con cuenta atrás naval (`24s..98s` según distancia `500m..2000m` y ángulo de adelanto $\cos \theta$) y estela de burbujas avanzando hacia el horizonte.
+  - Nuevo módulo visual `PeriscopeTargetRenderer.ts` con géiser de agua y fogonazo en el punto exacto del impacto, llamas y columna de humo negro en buques dañados (`1/2 HP`), y gráfico de hundimiento con fractura del casco en V.
+  - Impacto crítico (`2 HP`) al acertar con espoleta `IMPACT` en la sección central del casco (sala de máquinas) y ajuste automático de cota sugerida al cambiar de clase o espoleta en el TDC.
 - **Hito 1.4 — Capa Arcade: Ataque de Torpedos (`src/layers/arcade-torpedo/`) y Cierre de Fase 1:**
   - Reglas mecánicas y fórmulas cerradas del Módulo Arcade A (Periscopio, TDC y física de espoletas) documentadas en `/docs/GAME_DESIGN.md` (§6).
   - Catálogo de reconocimiento de buques (`ShipRecognitionManual.ts`) con 3 clases (`COASTAL_FREIGHTER` 85m/4.5m/2500 BRT/1 HP, `LIBERTY_CARGO` 135m/7.5m/7100 BRT/2 HP, `T2_TANKER` 160m/9.5m/10500 BRT/2 HP).

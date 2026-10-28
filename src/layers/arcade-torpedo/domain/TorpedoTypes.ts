@@ -7,7 +7,7 @@ import type {
   ShipRecognitionEntry,
 } from './ShipRecognitionManual.ts';
 
-// Define los contratos de entrada del TDC y el informe de telemetría posdisparo sin acoplarse al renderizado del periscopio
+// Define los contratos de entrada del TDC, giro de adelanto del periscopio, carrera del torpedo y telemetría posdisparo
 
 export type TorpedoPistolType = 'IMPACT' | 'MAGNETIC';
 
@@ -28,12 +28,23 @@ export interface TdcFiringInput {
   readonly estimatedAobDeg: number;
 }
 
+export interface ActiveTorpedoRunState {
+  readonly tubeId: string;
+  readonly firedBearingDeg: number;
+  readonly targetArrivalBearingDeg: number;
+  readonly elapsedScreenSeconds: number;
+  readonly totalScreenSeconds: number;
+  readonly realNavalRunSeconds: number;
+  readonly progress: number;
+}
+
 export interface TorpedoShotResolution {
   readonly firedTubeId: string;
   readonly outcome: TorpedoShotOutcomeType;
   readonly damageInflicted: number;
   readonly longitudinalMissMeters: number;
   readonly impactObliquityDeg: number;
+  readonly torpedoRunSeconds: number;
   readonly inputUsed: TdcFiringInput;
   readonly actualShipClass: RecognizedShipClass;
   readonly actualDraftMeters: number;
@@ -48,9 +59,14 @@ export interface TorpedoArcadeStateSnapshot {
   readonly recognizedManualEntry: ShipRecognitionEntry;
   readonly actualTargetEntry: ShipRecognitionEntry;
   readonly armory: TorpedoArmoryState;
+  readonly periscopeBearingDeg: number;
+  readonly targetBearingDeg: number;
+  readonly tdcSuggestedBearingDeg: number;
+  readonly activeTorpedoRun: ActiveTorpedoRunState | null;
   readonly targetDamageTaken: number;
   readonly targetMaxHitPoints: number;
   readonly isTargetSunk: boolean;
+  readonly sinkingProgress: number;
   readonly lastShotResolution: TorpedoShotResolution | null;
   readonly shotHistory: readonly TorpedoShotResolution[];
   readonly extraReloadTurnsElapsed: number;

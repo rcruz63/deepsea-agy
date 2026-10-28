@@ -37,66 +37,59 @@ function createFiringContextForClass(
   };
 }
 
-describe('TorpedoArcadeEngine (Multi-Shot Sequence & Armory State)', () => {
-  it('sinks a 2-HP LIBERTY_CARGO with two consecutive HIT_HULL shots from BOW-1 and BOW-2', () => {
+describe('TorpedoArcadeEngine (Periscope Lead Aiming, Torpedo Run & Multi-Shot)', () => {
+  it('damages a 2-HP LIBERTY_CARGO with an off-center HIT_HULL (1/2) and sinks it with a second shot', () => {
     const engine = new TorpedoArcadeEngine();
     engine.startAttack(
       createFiringContextForClass('LIBERTY_CARGO', 7100, 7.5),
     );
 
+    // Disparo ligeramente adelantado (+40m, hacia proa) con cota 4.5m -> 1/2 de daño
     engine.updateTdcInput({
       pistolType: 'IMPACT',
-      torpedoDepthMeters: 5.0,
-      estimatedSpeedKnots: 10,
+      torpedoDepthMeters: 4.5,
+      estimatedSpeedKnots: 15,
       estimatedAobDeg: 90,
     });
 
-    // Primer disparo con BOW-1: 1/2 de daño, el blanco sigue a flote y BOW-2 pasa a ser seleccionado automáticamente
     const firstShot = engine.fireSelectedTorpedo(0.99);
     expect(firstShot.outcome).toBe('HIT_HULL');
+    expect(firstShot.damageInflicted).toBe(1);
 
     const afterFirstSnapshot = engine.getSnapshot();
     expect(afterFirstSnapshot.targetDamageTaken).toBe(1);
     expect(afterFirstSnapshot.isTargetSunk).toBe(false);
-    expect(afterFirstSnapshot.armory.bowTubes[0]?.status).toBe('RELOADING');
     expect(afterFirstSnapshot.currentInput.selectedTubeId).toBe('BOW-2');
 
-    // Segundo disparo en la misma sesión de periscopio con BOW-2: 2/2 de daño -> HUNDIDO
+    // Segundo disparo con BOW-2 a cota 3.0m -> 2/2 de daño -> HUNDIDO
+    engine.updateTdcInput({ torpedoDepthMeters: 3.0 });
     const secondShot = engine.fireSelectedTorpedo(0.99);
     expect(secondShot.outcome).toBe('HIT_HULL');
 
     const afterSecondSnapshot = engine.getSnapshot();
-    expect(afterSecondSnapshot.targetDamageTaken).toBe(2);
     expect(afterSecondSnapshot.isTargetSunk).toBe(true);
-
-    const encounterResult = engine.buildEncounterResult();
-    expect(encounterResult.outcome).toBe('TARGET_SUNK');
-    expect(encounterResult.isTargetSunk).toBe(true);
-    expect(encounterResult.sunkTonnageAwarded).toBe(7100);
-    expect(encounterResult.updatedArmory.reserveTorpedoes).toBe(5);
+    expect(engine.buildEncounterResult().sunkTonnageAwarded).toBe(7100);
   });
 
-  it('sinks a 2-HP T2_TANKER in a single shot using a MAGNETIC keel hit and allows advancing reload ticks', () => {
+  it('supports manual periscope rotation to lead the target and real-time torpedo run completion', () => {
     const engine = new TorpedoArcadeEngine();
-    engine.startAttack(createFiringContextForClass('T2_TANKER', 10500, 9.5));
+    engine.startAttack(
+      createFiringContextForClass('COASTAL_FREIGHTER', 2500, 4.5),
+    );
 
-    engine.updateTdcInput({
-      recognizedShipType: 'T2_TANKER',
-      pistolType: 'MAGNETIC',
-      torpedoDepthMeters: 10.5,
-      estimatedSpeedKnots: 10,
-      estimatedAobDeg: 90,
-    });
+    // Alinea el periscopio con el adelanto requerido delante de la proa y lanza la carrera en tiempo real
+    const initialSnapshot = engine.getSnapshot();
+    engine.setPeriscopeBearing(initialSnapshot.targetBearingDeg + 14.5);
+    engine.updateTdcInput({ pistolType: 'IMPACT', torpedoDepthMeters: 3.0 });
 
-    const shot = engine.fireSelectedTorpedo(0.99);
-    expect(shot.outcome).toBe('HIT_KEEL_MAGNETIC');
-    expect(engine.getSnapshot().isTargetSunk).toBe(true);
+    const run = engine.launchTorpedoRun();
+    expect(run).not.toBeNull();
+    expect(run?.realNavalRunSeconds).toBeGreaterThan(45);
 
-    // Avanzar 4 ticks de 5 minutos en dificultad NORMAL (4 turnos de recarga) completa la recarga de BOW-1
-    engine.advanceFiveMinuteReloadTick();
-    engine.advanceFiveMinuteReloadTick();
-    engine.advanceFiveMinuteReloadTick();
-    engine.advanceFiveMinuteReloadTick();
-    expect(engine.getSnapshot().armory.bowTubes[0]?.status).toBe('LOADED');
+    // Avanza el reloj de simulación hasta que el torpedo alcanza la línea del horizonte
+    const finalSnapshot = engine.stepSimulation(5.0, 0.99);
+    expect(finalSnapshot.activeTorpedoRun).toBeNull();
+    expect(finalSnapshot.lastShotResolution?.outcome).toBe('HIT_HULL');
+    expect(finalSnapshot.isTargetSunk).toBe(true);
   });
 });

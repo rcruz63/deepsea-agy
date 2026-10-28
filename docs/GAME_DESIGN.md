@@ -75,7 +75,7 @@ Recursos `fuel` y `battery` acotados en `[0, 100]`. La costa (`LAND`) es intrans
 
 ### 5.1. Escala del Tablero y Avance del Contacto
 - Tablero hexagonal local de `15x15` celdas donde **`1 hexágono = 500 metros`** y **`1 turno = 5 minutos`**.
-- El mercante inicia en la zona central y avanza `1` hexágono por turno siguiendo su vector de rumbo (`heading`).
+- El mercante inicia en la zona central `(4, 7)` con rumbo transversal Este (`heading = 0`) y avanza `1` hexágono por turno hacia el borde Este, mientras el submarino inicia al sur `(4, 11)` para permitir una aproximación por el través sin bloqueos artificiales de popa pura (`AOB = 180°`).
 - Cada turno táctico avanza **`1 tick`** en la recarga de `TorpedoArmory` (`advanceArmoryReloadTurn`).
 
 ### 5.2. Cotas Tácticas (`TacticalDepth`), Velocidad y Consumo por Turno (5m)
@@ -105,27 +105,25 @@ Recursos `fuel` y `battery` acotados en `[0, 100]`. La costa (`LAND`) es intrans
 | `LIBERTY_CARGO` | Mercante Estándar | `135m` | `7.5m` | `7100` | `2` | Superestructura central, 2 mástiles. |
 | `T2_TANKER` | Petrolero Oceánico | `160m` | `9.5m` | `10500` | `2` | Puente a proa, pasarela larga, chimenea a popa. |
 
-### 6.2. Parámetros del TDC (`TdcFiringInput`)
-1. `selectedTubeId`: Tubo en estado `LOADED`.
-2. `recognizedShipType`: Clase consultada en el manual (`COASTAL_FREIGHTER`, `LIBERTY_CARGO`, `T2_TANKER`).
-3. `pistolType`: Espoleta `'IMPACT' | 'MAGNETIC'`.
-4. `torpedoDepthMeters`: Profundidad regulada de `1.0m` a `12.0m` (pasos de `0.5m`).
-5. `estimatedSpeedKnots`: Velocidad estimada del blanco (`0..20` nudos).
-6. `estimatedAobDeg`: Ángulo en la proa estimado (`0°..180°`).
+### 6.2. Giro del Periscopio (Adelanto del Tiro) y Parámetros del TDC (`TdcFiringInput`)
+- **Movimiento Lateral en Tiempo Real y Adelanto (*Lead Angle*):**
+  - El mercante navega horizontalmente por el horizonte en la dirección de su proa (`STARBOARD` = izquierda a derecha; `PORT` = derecha a izquierda) a una velocidad angular proporcional a `targetSpeedKnots * sin(targetAngleOnBowDeg) / distanceMeters`.
+  - El jugador **gira el periscopio** (`periscopeBearingDeg` en `[-35°, +35°]`) mediante teclado (`A`/`D` o `◄`/`►`), clic en la lente o botones del panel para **adelantar la retícula vertical por delante de la proa del buque**.
+  - Al introducir `estimatedSpeedKnots` y `estimatedAobDeg` en el TDC, el calculador proyecta un **marcador guía de adelanto (`TDC LEAD`)** delante de la proa indicando dónde debe apuntarse el hilo central para compensar el movimiento del blanco.
+- **Tiempo de Carrera del Torpedo (`torpedoRunSeconds`):**
+  - La velocidad del torpedo es de `40 nudos` (`~20.58 m/s`).
+  - La distancia efectiva recorrida según el ángulo de adelanto $\theta$ es $d_{\text{eff}} = \text{distanceMeters} / \cos(\theta)$, por lo que el tiempo real de carrera es $T_{\text{naval}} = d_{\text{eff}} / 20.58\text{ s}$ (`~24s` a `500m` hasta `~98s` a `2000m`), comprimido visualmente en una carrera animada de `1.4s` a `4.2s` durante la cual el torpedo y el buque avanzan simultáneamente hacia el punto de encuentro.
 
 ### 6.3. Resolución Balística y de Espoleta (`TorpedoResolutionEngine`)
 1. **Desvío Longitudinal en el Cruce (`longitudinalMissMeters`):**
-   - `distanceFactor = distanceMeters / 1000`
-   - `speedErrorMeters = (estimatedSpeedKnots - targetSpeedKnots) * 8 * distanceFactor`
-   - `aobErrorMeters = (estimatedAobDeg - targetAngleOnBowDeg) * 1.2 * distanceFactor`
-   - `longitudinalMissMeters = speedErrorMeters + aobErrorMeters`
+   - Mide la distancia en metros entre el centro del buque y el punto de cruce del torpedo en el instante exacto en que este alcanza la línea del horizonte.
    - Si `longitudinalMissMeters > lengthMeters / 2` -> `MISSED_AHEAD` (falla por proa).
    - Si `longitudinalMissMeters < -lengthMeters / 2` -> `MISSED_ASTERN` (falla por popa).
 2. **Evaluación de Cota y Espoleta (cuando `|longitudinalMissMeters| <= lengthMeters / 2`):**
    - **Caso 1 (`torpedoDepthMeters <= draftMeters` — Choque físico con el casco):**
      - `obliquityDeg = |90 - targetAngleOnBowDeg|`.
-     - Si `obliquityDeg > impactAngleToleranceDegrees` (`60°` en Normal -> `AOB < 30°` o `AOB > 150°`) o actúa `dudProbability`, rebota sin detonar: `GLANCING_DUD` (`0` daño).
-     - En caso contrario detona contra el casco: `HIT_HULL` (`1` punto de daño estructural).
+     - Si `obliquityDeg > impactAngleToleranceDegrees` (`70°` en Normal -> `AOB < 20°` o `AOB > 160°`) o actúa `dudProbability`, rebota sin detonar: `GLANCING_DUD` (`0` daño).
+     - Si impacta en la sección central del buque (`|longitudinalMissMeters| <= lengthMeters * 0.225` con espoleta `IMPACT`, sala de máquinas/pañoles), causa **daño estructural crítico (`2` puntos de daño)** en `HIT_HULL`; en proa o popa causa `1` punto de daño.
    - **Caso 2 (`draftMeters < torpedoDepthMeters <= draftMeters + magneticWindowMeters`):**
      - `magneticWindowMeters = 2.0m` en `EASY` y `1.5m` en `NORMAL`/`HARD`.
      - Si `pistolType === 'MAGNETIC'`, detona bajo la quilla partiendo la viga maestra: `HIT_KEEL_MAGNETIC` (`2` puntos de daño crítico, hundimiento inmediato).
