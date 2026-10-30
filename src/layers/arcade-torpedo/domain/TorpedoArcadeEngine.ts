@@ -1,6 +1,6 @@
 import { advanceArmoryReloadTurn, canStartTorpedoReloadInArmory, findTorpedoTubeById, fireTorpedoTubeInArmory, startTorpedoReloadInArmory } from '../../../core/armory/index.ts';
 import type { EncounterResult, FiringSolutionContext, TorpedoArmoryState } from '../../../core/contracts/index.ts';
-import { MAX_TORPEDO_DEPTH_METERS, MIN_TORPEDO_DEPTH_METERS, advanceTargetHorizonBearing, calculateLeadAngleOffsetDeg, calculateTorpedoRunTimings, clampPeriscopeBearing, mergeAndClampTdcInput, stepActiveTorpedoRun } from './PeriscopeKinematics.ts';
+import { MAX_TORPEDO_DEPTH_METERS, MIN_TORPEDO_DEPTH_METERS, advanceTargetHorizonBearing, calculateLeadAngleOffsetDeg, calculateTorpedoRunTimings, clampPeriscopeBearing, mergeAndClampTdcInput, normalizePeriscopeBroadsideAob, stepActiveTorpedoRun } from './PeriscopeKinematics.ts';
 import { type ShipRecognitionEntry, getShipRecognitionEntry, resolveActualShipRecognitionEntry } from './ShipRecognitionManual.ts';
 import { resolveTorpedoShot } from './TorpedoResolutionEngine.ts';
 import type { ActiveTorpedoRunState, TdcFiringInput, TorpedoArcadeStateSnapshot, TorpedoShotResolution } from './TorpedoTypes.ts';
@@ -29,7 +29,12 @@ export class TorpedoArcadeEngine {
   private extraReloadTurnsElapsed = 0;
 
   public startAttack(context: FiringSolutionContext): void {
-    this.firingContext = context;
+    const normalizedAob = normalizePeriscopeBroadsideAob(context.targetAngleOnBowDeg);
+    this.firingContext = {
+      ...context,
+      targetAngleOnBowDeg: normalizedAob,
+      trueAngleOnBowDegrees: normalizedAob,
+    };
     this.actualTargetEntry = resolveActualShipRecognitionEntry(
       context.targetShip.spec.specId,
       context.targetShip.spec.draftMeters,
@@ -42,21 +47,21 @@ export class TorpedoArcadeEngine {
     this.extraReloadTurnsElapsed = 0;
     this.activeTorpedoRun = null;
     this.hasManualBearingOverride = false;
-    this.targetBearingDeg = (context.targetBowSide === 'STARBOARD' ? -1 : 1) * 6;
+    this.targetBearingDeg = (context.targetBowSide === 'STARBOARD' ? -1 : 1) * 10;
     this.periscopeBearingDeg = 0;
     this.currentInput = {
       selectedTubeId: findFirstLoadedTubeId(context.armory),
       recognizedShipType: 'COASTAL_FREIGHTER',
       pistolType: 'IMPACT',
       torpedoDepthMeters: 3.5,
-      estimatedSpeedKnots: 8,
-      estimatedAobDeg: 60,
+      estimatedSpeedKnots: context.targetSpeedKnots,
+      estimatedAobDeg: normalizedAob,
     };
   }
 
   public getSnapshot(): TorpedoArcadeStateSnapshot {
     const { context, input, actualEntry, armory } = this.assertInitialized();
-    const tdcLeadOffset = calculateLeadAngleOffsetDeg(input.estimatedSpeedKnots, input.estimatedAobDeg, context.targetBowSide);
+    const tdcLeadOffset = calculateLeadAngleOffsetDeg(context.targetSpeedKnots, context.targetAngleOnBowDeg, context.targetBowSide);
     return {
       firingContext: context,
       currentInput: input,

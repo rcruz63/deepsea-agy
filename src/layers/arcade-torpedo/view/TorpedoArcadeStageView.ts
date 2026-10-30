@@ -126,14 +126,9 @@ export class TorpedoArcadeStageView {
       this.engine.rotatePeriscope(Number(actionId.slice('ROTATE_PERISCOPE:'.length)));
       return;
     }
-    if (actionId === 'SYNC_TDC_LEAD') {
-      this.engine.setPeriscopeBearing(snapshot.tdcSuggestedBearingDeg);
-      return;
-    }
     if (actionId.startsWith('SET_CLASS:')) {
       const recognizedShipType = actionId.slice('SET_CLASS:'.length) as RecognizedShipClass;
       const entry = this.engine.updateTdcInput({ recognizedShipType }).recognizedManualEntry;
-      // Ajusta una cota segura sugerida según la clase consultada en el manual para facilitar el disparo
       const suggestedDepth = currentInput.pistolType === 'MAGNETIC' ? entry.draftMeters + 1.0 : Math.max(2.0, entry.draftMeters - 1.5);
       this.engine.updateTdcInput({ torpedoDepthMeters: suggestedDepth });
       return;
@@ -147,14 +142,6 @@ export class TorpedoArcadeStageView {
     }
     if (actionId.startsWith('STEP_DEPTH:')) {
       this.engine.updateTdcInput({ torpedoDepthMeters: currentInput.torpedoDepthMeters + Number(actionId.slice('STEP_DEPTH:'.length)) });
-      return;
-    }
-    if (actionId.startsWith('STEP_SPEED:')) {
-      this.engine.updateTdcInput({ estimatedSpeedKnots: currentInput.estimatedSpeedKnots + Number(actionId.slice('STEP_SPEED:'.length)) });
-      return;
-    }
-    if (actionId.startsWith('STEP_AOB:')) {
-      this.engine.updateTdcInput({ estimatedAobDeg: currentInput.estimatedAobDeg + Number(actionId.slice('STEP_AOB:'.length)) });
       return;
     }
     if (actionId.startsWith('SELECT_TUBE:')) {

@@ -7,6 +7,12 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
 
 ## [Unreleased]
 
+### Changed
+- **Simplificación de la Consola de Periscopio y Corrección de Geometría de Impacto (`src/layers/arcade-torpedo/`):**
+  - Eliminados los botones redundantes de velocidad estimada, AOB estimado y caja fantasma en `TdcControlPanelRenderer.ts` y `PeriscopeTargetRenderer.ts`.
+  - Normalizado el ángulo de través al abrir el periscopio (`normalizePeriscopeBroadsideAob`) y expresado el ángulo de incidencia en casco (`90° = perpendicular óptimo`) en `PeriscopeLensRenderer.ts`.
+  - Ampliado el horizonte del blanco a `±58°` y el giro del periscopio a `±45°` en `PeriscopeKinematics.ts` para evitar que el barco salte a la izquierda cuando se apunta hacia `+30°`.
+
 ### Added
 - **Mejora Jugable y Visual del Periscopio (`src/layers/arcade-torpedo/`):**
   - Giro interactivo del periscopio (`PeriscopeKinematics.ts`) mediante teclado (`A`/`D` o `◄`/`►`), clic directo sobre la lente o consola TDC para adelantar el disparo (*lead angle*) frente al avance lateral en tiempo real del mercante.

@@ -2,7 +2,7 @@ import { findTorpedoTubeById } from '../../../core/armory/index.ts';
 import { type RecognizedShipClass, SHIP_RECOGNITION_CATALOG } from '../domain/ShipRecognitionManual.ts';
 import type { TorpedoArcadeStateSnapshot } from '../domain/TorpedoTypes.ts';
 
-// Dibuja la consola derecha del TDC: giro de periscopio, manual naval, espoleta, cota, velocidad, AOB, tubos y disparo
+// Dibuja la consola simplificada de ataque: manual naval, giro del periscopio, espoleta, profundidad y tubos
 
 export interface TdcControlRegion {
   readonly actionId: string;
@@ -49,7 +49,7 @@ function renderManualClassButtons(
     regions.push(
       drawTdcButton(
         context,
-        { actionId: `SET_CLASS:${entry.shipClass}`, x: buttonX, y: 46, width: 88, height: 24, isEnabled: true },
+        { actionId: `SET_CLASS:${entry.shipClass}`, x: buttonX, y: 48, width: 88, height: 26, isEnabled: true },
         labels[entry.shipClass],
         '#4cc9f0',
         entry.shipClass === selectedClass,
@@ -57,30 +57,6 @@ function renderManualClassButtons(
     );
     buttonX += 92;
   }
-}
-
-function renderStepperRow(
-  context: CanvasRenderingContext2D,
-  title: string,
-  valueText: string,
-  y: number,
-  minusAction: string,
-  plusAction: string,
-  regions: TdcControlRegion[],
-): void {
-  context.fillStyle = '#a8dadc';
-  context.font = 'bold 11px monospace';
-  context.textAlign = 'left';
-  context.fillText(title, 664, y + 16);
-
-  regions.push(
-    drawTdcButton(context, { actionId: minusAction, x: 816, y, width: 34, height: 22, isEnabled: true }, '-', '#ffd166'),
-    drawTdcButton(context, { actionId: plusAction, x: 902, y, width: 34, height: 22, isEnabled: true }, '+', '#ffd166'),
-  );
-
-  context.fillStyle = '#00ffaa';
-  context.textAlign = 'center';
-  context.fillText(valueText, 876, y + 15);
 }
 
 export function renderTdcControlPanel(
@@ -99,7 +75,7 @@ export function renderTdcControlPanel(
   context.fillStyle = '#00ffaa';
   context.font = 'bold 12px monospace';
   context.textAlign = 'left';
-  context.fillText('MANUAL DE RECONOCIMIENTO NAVAL', 664, 34);
+  context.fillText('1. MANUAL DE RECONOCIMIENTO', 664, 36);
 
   renderManualClassButtons(context, currentInput.recognizedShipType, regions);
 
@@ -107,36 +83,54 @@ export function renderTdcControlPanel(
   context.font = '10px monospace';
   context.textAlign = 'left';
   context.fillText(
-    `Teórico: Eslora ${recognizedManualEntry.lengthMeters}m | Calado ${recognizedManualEntry.draftMeters}m | ${recognizedManualEntry.tonnage} BRT`,
+    `Eslora: ${recognizedManualEntry.lengthMeters}m | Calado: ${recognizedManualEntry.draftMeters}m | ${recognizedManualEntry.tonnage} BRT`,
     664,
-    84,
+    90,
   );
   context.fillStyle = '#8ab8a8';
-  context.fillText(`Rasgo: ${recognizedManualEntry.silhouetteDescription}`, 664, 98);
+  context.fillText(`Silueta: ${recognizedManualEntry.silhouetteDescription}`, 664, 106);
 
-  // Controles de giro directo del periscopio para adelantar el disparo
+  // Sección 2: Giro del Periscopio para adelantar el tiro
+  context.fillStyle = '#00ffaa';
+  context.font = 'bold 11px monospace';
+  context.fillText('2. GIRO DEL PERISCOPIO (ADELANTO)', 664, 132);
   regions.push(
-    drawTdcButton(context, { actionId: 'ROTATE_PERISCOPE:-2', x: 664, y: 108, width: 88, height: 24, isEnabled: true }, '◄ GIRAR -2°', '#00ffaa'),
-    drawTdcButton(context, { actionId: 'SYNC_TDC_LEAD', x: 756, y: 108, width: 88, height: 24, isEnabled: true }, 'ALINEAR TDC', '#4cc9f0'),
-    drawTdcButton(context, { actionId: 'ROTATE_PERISCOPE:2', x: 848, y: 108, width: 88, height: 24, isEnabled: true }, 'GIRAR +2° ►', '#00ffaa'),
+    drawTdcButton(context, { actionId: 'ROTATE_PERISCOPE:-5', x: 664, y: 140, width: 64, height: 26, isEnabled: true }, '◄◄ -5°', '#00ffaa'),
+    drawTdcButton(context, { actionId: 'ROTATE_PERISCOPE:-1', x: 733, y: 140, width: 64, height: 26, isEnabled: true }, '◄ -1°', '#63f5c4'),
+    drawTdcButton(context, { actionId: 'ROTATE_PERISCOPE:1', x: 803, y: 140, width: 64, height: 26, isEnabled: true }, '+1° ►', '#63f5c4'),
+    drawTdcButton(context, { actionId: 'ROTATE_PERISCOPE:5', x: 872, y: 140, width: 64, height: 26, isEnabled: true }, '+5° ►►', '#00ffaa'),
   );
 
+  // Sección 3: Espoleta y Profundidad
+  context.fillStyle = '#00ffaa';
+  context.font = 'bold 11px monospace';
+  context.textAlign = 'left';
+  context.fillText('3. ESPOLETA Y PROFUNDIDAD', 664, 188);
   regions.push(
-    drawTdcButton(context, { actionId: 'SET_PISTOL:IMPACT', x: 664, y: 138, width: 132, height: 24, isEnabled: true }, 'ESPOLETA IMPACTO', '#00ffaa', currentInput.pistolType === 'IMPACT'),
-    drawTdcButton(context, { actionId: 'SET_PISTOL:MAGNETIC', x: 804, y: 138, width: 132, height: 24, isEnabled: true }, 'ESPOLETA MAGNÉTICA', '#4cc9f0', currentInput.pistolType === 'MAGNETIC'),
+    drawTdcButton(context, { actionId: 'SET_PISTOL:IMPACT', x: 664, y: 196, width: 132, height: 26, isEnabled: true }, 'IMPACTO (<= CALADO)', '#00ffaa', currentInput.pistolType === 'IMPACT'),
+    drawTdcButton(context, { actionId: 'SET_PISTOL:MAGNETIC', x: 804, y: 196, width: 132, height: 26, isEnabled: true }, 'MAGNÉTICA (+1m)', '#4cc9f0', currentInput.pistolType === 'MAGNETIC'),
   );
 
-  renderStepperRow(context, 'PROF. TORPEDO', `${currentInput.torpedoDepthMeters.toFixed(1)}m`, 170, 'STEP_DEPTH:-0.5', 'STEP_DEPTH:0.5', regions);
-  renderStepperRow(context, 'VEL. BLANCO', `${currentInput.estimatedSpeedKnots} kn`, 198, 'STEP_SPEED:-1', 'STEP_SPEED:1', regions);
-  renderStepperRow(context, 'AOB ESTIMADO', `${currentInput.estimatedAobDeg}°`, 226, 'STEP_AOB:-5', 'STEP_AOB:5', regions);
+  context.fillStyle = '#a8dadc';
+  context.font = 'bold 11px monospace';
+  context.textAlign = 'left';
+  context.fillText('PROF. TORPEDO', 664, 248);
+  regions.push(
+    drawTdcButton(context, { actionId: 'STEP_DEPTH:-0.5', x: 804, y: 231, width: 38, height: 26, isEnabled: true }, '-0.5', '#ffd166'),
+    drawTdcButton(context, { actionId: 'STEP_DEPTH:0.5', x: 898, y: 231, width: 38, height: 26, isEnabled: true }, '+0.5', '#ffd166'),
+  );
+  context.fillStyle = '#00ffaa';
+  context.textAlign = 'center';
+  context.fillText(`${currentInput.torpedoDepthMeters.toFixed(1)}m`, 870, 248);
 
+  // Sección 4: Selección de Tubos
   context.fillStyle = '#63f5c4';
   context.font = 'bold 11px monospace';
   context.textAlign = 'left';
-  context.fillText(`SELECCIÓN DE TUBO (RESERVA: ${armory.reserveTorpedoes})`, 664, 268);
+  context.fillText(`4. TUBO LANZATORPEDOS (RESERVA: ${armory.reserveTorpedoes})`, 664, 280);
 
   const allTubes = [...armory.bowTubes, ...armory.sternTubes];
-  let tubeY = 276;
+  let tubeY = 288;
   for (const tube of allTubes) {
     const isLoaded = tube.status === 'LOADED';
     const label = tube.status === 'RELOADING' ? `${tube.tubeId}: RELOADING (${tube.remainingReloadTurns}t)` : `${tube.tubeId}: ${tube.status}`;
@@ -161,9 +155,9 @@ export function renderTdcControlPanel(
       : '¡FUEGO! (ESPACIO / CLIC)';
 
   regions.push(
-    drawTdcButton(context, { actionId: 'FIRE_TORPEDO', x: 664, y: 432, width: 272, height: 48, isEnabled: canFire }, fireLabel, '#ef476f'),
-    drawTdcButton(context, { actionId: 'ADVANCE_RELOAD_TICK', x: 664, y: 492, width: 272, height: 34, isEnabled: !isTargetSunk && activeTorpedoRun === null }, 'AVANZAR 5 MIN (RECARGAR TUBOS +1 TICK)', '#ffd166'),
-    drawTdcButton(context, { actionId: 'EXIT_PERISCOPE', x: 664, y: 538, width: 272, height: 46, isEnabled: activeTorpedoRun === null }, 'BAJAR PERISCOPIO / VOLVER A PATRULLA', '#00ffaa'),
+    drawTdcButton(context, { actionId: 'FIRE_TORPEDO', x: 664, y: 436, width: 272, height: 48, isEnabled: canFire }, fireLabel, '#ef476f'),
+    drawTdcButton(context, { actionId: 'ADVANCE_RELOAD_TICK', x: 664, y: 496, width: 272, height: 34, isEnabled: !isTargetSunk && activeTorpedoRun === null }, 'AVANZAR 5 MIN (RECARGAR TUBOS +1 TICK)', '#ffd166'),
+    drawTdcButton(context, { actionId: 'EXIT_PERISCOPE', x: 664, y: 542, width: 272, height: 46, isEnabled: activeTorpedoRun === null }, 'BAJAR PERISCOPIO / VOLVER A PATRULLA', '#00ffaa'),
   );
 
   return regions;

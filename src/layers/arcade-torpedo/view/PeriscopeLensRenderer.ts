@@ -23,10 +23,10 @@ function renderBearingScale(
   context.font = '9px monospace';
   context.textAlign = 'center';
 
-  for (let deg = -35; deg <= 35; deg += 5) {
+  for (let deg = -55; deg <= 55; deg += 5) {
     const screenX =
       PERISCOPE_LENS_CENTER_X + (deg - periscopeBearingDeg) * PIXELS_PER_BEARING_DEGREE;
-    if (screenX < PERISCOPE_LENS_CENTER_X - 180 || screenX > PERISCOPE_LENS_CENTER_X + 180) {
+    if (screenX < PERISCOPE_LENS_CENTER_X - 185 || screenX > PERISCOPE_LENS_CENTER_X + 185) {
       continue;
     }
     const tickHeight = deg % 10 === 0 ? 10 : 5;
@@ -64,7 +64,6 @@ function renderActiveTorpedoWake(
   context.stroke();
   context.setLineDash([]);
 
-  // Cabeza de burbujas del torpedo acercándose al barco
   context.fillStyle = '#ffffff';
   context.beginPath();
   context.arc(torpedoScreenX, wakeY, 3.5, 0, Math.PI * 2);
@@ -90,8 +89,7 @@ function renderShotTelemetryBox(
   shot: TorpedoShotResolution | null,
 ): void {
   const { targetDamageTaken, targetMaxHitPoints, firingContext } = snapshot;
-  const obliquityDeg = Math.abs(90 - firingContext.targetAngleOnBowDeg);
-  const isAngleSafe = obliquityDeg <= firingContext.difficulty.impactAngleToleranceDegrees;
+  const hullImpactAngleDeg = 90 - Math.abs(90 - firingContext.targetAngleOnBowDeg);
 
   context.strokeStyle = '#1f544c';
   context.fillStyle = '#061319';
@@ -102,16 +100,14 @@ function renderShotTelemetryBox(
   if (shot === null) {
     context.fillStyle = '#63f5c4';
     context.font = 'bold 12px monospace';
-    context.fillText('PUNTERÍA CON ADELANTO EN PERISCOPIO (CLIC EN LENTE, TECLAS A/D O ◄/►)', 34, 504);
+    context.fillText('CÓMO APUNTAR CON ADELANTO EN EL PERISCOPIO', 34, 504);
     context.font = '11px monospace';
     context.fillStyle = '#a8dadc';
-    context.fillText('• Gira el periscopio para situar el hilo central delante de la proa (o sobre ADELANTO TDC).', 34, 526);
-    context.fillText('• Impacto directo en el centro del casco (sala de máquinas) o Magnético bajo quilla = 2 DAÑO.', 34, 546);
-    context.fillStyle = isAngleSafe ? '#00ffaa' : '#ef476f';
+    context.fillText('1. Identifica el barco por su silueta y selecciona su clase a la derecha para ver su Calado.', 34, 526);
+    context.fillText('2. Gira el periscopio (clic en la lente o teclas A/D) para situar el hilo central DELANTE de su proa.', 34, 546);
+    context.fillStyle = '#00ffaa';
     context.fillText(
-      isAngleSafe
-        ? `• Geometría de impacto: ÓPTIMA (Oblicuidad ${obliquityDeg}° <= ${firingContext.difficulty.impactAngleToleranceDegrees}° tolerados)`
-        : `• ¡AVISO!: Ángulo muy oblicuo (${obliquityDeg}°). Usa espoleta MAGNÉTICA bajo quilla.`,
+      `3. Ángulo de incidencia en casco: ${hullImpactAngleDeg}° (ÓPTIMO para espoleta de IMPACTO o MAGNÉTICA).`,
       34,
       568,
     );
@@ -120,6 +116,7 @@ function renderShotTelemetryBox(
     return;
   }
 
+  const shotImpactAngleDeg = 90 - shot.impactObliquityDeg;
   context.fillStyle = shot.damageInflicted > 0 ? '#00ffaa' : '#ffd166';
   context.font = 'bold 12px monospace';
   context.fillText(
@@ -129,11 +126,17 @@ function renderShotTelemetryBox(
   );
   context.font = '11px monospace';
   context.fillStyle = '#e0fbfc';
-  context.fillText(`• Desvío longitudinal en cruce : ${shot.longitudinalMissMeters} m (Eslora real: ${shot.actualLengthMeters} m)`, 34, 532);
-  context.fillText(`• Cota Torpedo vs Calado Real  : ${shot.inputUsed.torpedoDepthMeters} m vs Calado ${shot.actualDraftMeters} m (${shot.actualShipClass})`, 34, 554);
-  context.fillText(`• Velocidad y AOB (Est vs Real): Vel ${shot.inputUsed.estimatedSpeedKnots} vs ${shot.actualSpeedKnots} kn | AOB ${shot.inputUsed.estimatedAobDeg}° vs ${shot.actualAobDeg}°`, 34, 576);
+  context.fillText(`• Desvío en el cruce   : ${shot.longitudinalMissMeters} m respecto al centro (Eslora real: ${shot.actualLengthMeters} m)`, 34, 532);
+  context.fillText(`• Cota vs Calado Real  : Torpedo a ${shot.inputUsed.torpedoDepthMeters} m | Calado real ${shot.actualDraftMeters} m (${shot.actualShipClass})`, 34, 554);
+  context.fillText(`• Velocidad real blanco: ${shot.actualSpeedKnots} nudos | Ángulo de impacto en casco: ${shotImpactAngleDeg}° (90° = perpendicular)`, 34, 576);
   context.fillStyle = '#8ecae6';
-  context.fillText(`• Oblicuidad de impacto: ${shot.impactObliquityDeg}° (Tolerancia: ${firingContext.difficulty.impactAngleToleranceDegrees}°)`, 34, 598);
+  context.fillText(
+    shot.longitudinalMissMeters > 0
+      ? '• Pista: Si fallas por delante (MISSED_AHEAD), adelanta MENOS grados el periscopio.'
+      : '• Pista: Si fallas por popa (MISSED_ASTERN), adelanta MÁS grados delante de la proa.',
+    34,
+    598,
+  );
 }
 
 export function renderPeriscopeLensView(
@@ -157,7 +160,6 @@ export function renderPeriscopeLensView(
   renderBearingScale(context, snapshot.periscopeBearingDeg);
   renderActiveTorpedoWake(context, snapshot);
 
-  // Hilo central de puntería del periscopio
   context.strokeStyle = 'rgba(0, 255, 170, 0.55)';
   context.lineWidth = 1.2;
   context.beginPath();
@@ -175,11 +177,12 @@ export function renderPeriscopeLensView(
   context.stroke();
 
   const bearingText = snapshot.periscopeBearingDeg > 0 ? `+${snapshot.periscopeBearingDeg.toFixed(1)}°` : `${snapshot.periscopeBearingDeg.toFixed(1)}°`;
+  const shipPosText = snapshot.targetBearingDeg > 0 ? `+${snapshot.targetBearingDeg.toFixed(1)}°` : `${snapshot.targetBearingDeg.toFixed(1)}°`;
   context.fillStyle = '#00ffaa';
   context.font = 'bold 12px monospace';
   context.textAlign = 'center';
   context.fillText(
-    `DISTANCIA: ${snapshot.firingContext.distanceMeters}m | BANDA: ${snapshot.firingContext.targetBowSide} | GIRO PERISCOPIO: ${bearingText}`,
+    `DISTANCIA: ${snapshot.firingContext.distanceMeters}m | BARCO EN: ${shipPosText} | PERISCOPIO EN: ${bearingText}`,
     PERISCOPE_LENS_CENTER_X,
     24,
   );

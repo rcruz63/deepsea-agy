@@ -7,7 +7,8 @@ import type { ActiveTorpedoRunState, TdcFiringInput } from './TorpedoTypes.ts';
 // Modela la cinemática angular del periscopio: ángulo de adelanto (lead angle), tiempo de carrera del torpedo y deriva del blanco
 
 export const TORPEDO_SPEED_KNOTS = 40;
-export const MAX_PERISCOPE_BEARING_DEG = 35;
+export const MAX_PERISCOPE_BEARING_DEG = 45;
+export const TARGET_HORIZON_LIMIT_DEG = 58;
 export const MIN_TORPEDO_DEPTH_METERS = 1.0;
 export const MAX_TORPEDO_DEPTH_METERS = 12.0;
 const METERS_PER_SECOND_PER_KNOT = 0.514444;
@@ -22,6 +23,17 @@ export function clampPeriscopeBearing(bearingDeg: number): number {
     -MAX_PERISCOPE_BEARING_DEG,
     MAX_PERISCOPE_BEARING_DEG,
   );
+}
+
+// Normaliza el AOB al entrar al periscopio para garantizar que el buque navegue de través (55°..125°) coherente con su vista lateral
+export function normalizePeriscopeBroadsideAob(rawAobDeg: number): number {
+  if (rawAobDeg < 55) {
+    return 75;
+  }
+  if (rawAobDeg > 125) {
+    return 105;
+  }
+  return rawAobDeg;
 }
 
 export function mergeAndClampTdcInput(
@@ -55,7 +67,7 @@ export function calculateLeadAngleOffsetDeg(
 ): number {
   const bowSign = bowSide === 'STARBOARD' ? 1 : -1;
   const aobRadians = (angleOnBowDeg * Math.PI) / 180;
-  const effectiveSin = Math.max(0.25, Math.abs(Math.sin(aobRadians)));
+  const effectiveSin = Math.max(0.5, Math.abs(Math.sin(aobRadians)));
   const sinLead = Math.min(0.85, (speedKnots * effectiveSin) / TORPEDO_SPEED_KNOTS);
   const leadDeg = (Math.asin(sinLead) * 180) / Math.PI;
   return Math.round(bowSign * leadDeg * 10) / 10;
@@ -66,7 +78,7 @@ export function calculateTorpedoRunTimings(
   distanceMeters: number,
   leadAngleDeg = 0,
 ): { readonly realNavalRunSeconds: number; readonly totalScreenSeconds: number } {
-  const cosAngle = Math.max(0.75, Math.cos((leadAngleDeg * Math.PI) / 180));
+  const cosAngle = Math.max(0.7, Math.cos((leadAngleDeg * Math.PI) / 180));
   const effectiveDistanceMeters = distanceMeters / cosAngle;
   const torpedoMetersPerSecond = TORPEDO_SPEED_KNOTS * METERS_PER_SECOND_PER_KNOT;
   const realNavalRunSeconds =
@@ -84,15 +96,18 @@ export function advanceTargetHorizonBearing(
   deltaSeconds: number,
 ): number {
   const bowSign = firingContext.targetBowSide === 'STARBOARD' ? 1 : -1;
-  const damageSpeedFactor = targetDamageTaken > 0 ? 0.55 : 1;
+  const damageSpeedFactor = targetDamageTaken > 0 ? 0.5 : 1;
   const angularSpeedDegPerSec =
     bowSign *
     (firingContext.targetSpeedKnots / 10) *
-    (1200 / firingContext.distanceMeters) *
-    1.15 *
+    (1000 / firingContext.distanceMeters) *
+    0.85 *
     damageSpeedFactor;
   const nextBearing = currentTargetBearingDeg + angularSpeedDegPerSec * deltaSeconds;
-  return Math.abs(nextBearing) > 24 ? -bowSign * 18 : nextBearing;
+  // Solo reinicia el tránsito cuando el buque rebasa ampliamente el arco máximo de giro del periscopio (±58° > ±45°)
+  return Math.abs(nextBearing) > TARGET_HORIZON_LIMIT_DEG
+    ? -bowSign * 38
+    : nextBearing;
 }
 
 export function stepActiveTorpedoRun(

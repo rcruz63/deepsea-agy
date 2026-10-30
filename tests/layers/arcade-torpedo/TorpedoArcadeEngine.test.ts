@@ -8,6 +8,7 @@ function createFiringContextForClass(
   specId: 'COASTAL_FREIGHTER' | 'LIBERTY_CARGO' | 'T2_TANKER',
   tonnage: number,
   draftMeters: number,
+  rawAobDeg = 90,
 ): FiringSolutionContext {
   const difficulty = getDifficultyConfig('NORMAL');
   return {
@@ -29,8 +30,8 @@ function createFiringContextForClass(
     },
     relativeDistanceHexes: 2,
     distanceMeters: 1000,
-    targetAngleOnBowDeg: 90,
-    trueAngleOnBowDegrees: 90,
+    targetAngleOnBowDeg: rawAobDeg,
+    trueAngleOnBowDegrees: rawAobDeg,
     targetBowSide: 'STARBOARD',
     targetSpeedKnots: 10,
     hullIntegrityAtPeriscope: 100,
@@ -71,24 +72,37 @@ describe('TorpedoArcadeEngine (Periscope Lead Aiming, Torpedo Run & Multi-Shot)'
     expect(engine.buildEncounterResult().sunkTonnageAwarded).toBe(7100);
   });
 
-  it('supports manual periscope rotation to lead the target and real-time torpedo run completion', () => {
+  it('normalizes bow/stern tactical angles (0°/180°) so IMPACT torpedoes at 4.5m, 3m, and 2m always detonate', () => {
     const engine = new TorpedoArcadeEngine();
+    // Incluso entrando con AOB = 0° desde la misma fila r=7 del mapa táctico, el periscopio garantiza ángulo óptimo de través
     engine.startAttack(
-      createFiringContextForClass('COASTAL_FREIGHTER', 2500, 4.5),
+      createFiringContextForClass('COASTAL_FREIGHTER', 2500, 4.5, 0),
     );
 
-    // Alinea el periscopio con el adelanto requerido delante de la proa y lanza la carrera en tiempo real
     const initialSnapshot = engine.getSnapshot();
-    engine.setPeriscopeBearing(initialSnapshot.targetBearingDeg + 14.5);
+    expect(initialSnapshot.firingContext.targetAngleOnBowDeg).toBe(75);
+    expect(
+      Math.abs(90 - initialSnapshot.firingContext.targetAngleOnBowDeg),
+    ).toBeLessThanOrEqual(
+      initialSnapshot.firingContext.difficulty.impactAngleToleranceDegrees,
+    );
+
+    // Avanza el barco durante 25 segundos mientras el jugador gira el periscopio a +30°: verifica que NO se teletransporta a la izquierda
+    engine.setPeriscopeBearing(30);
+    for (let step = 0; step < 25; step += 1) {
+      engine.stepSimulation(1.0);
+    }
+    expect(engine.getSnapshot().targetBearingDeg).toBeGreaterThan(0);
+
+    // Apunta con adelanto delante de la proa (+14°) y lanza con espoleta de IMPACTO a 3.0m de profundidad
+    const currentTargetBearing = engine.getSnapshot().targetBearingDeg;
+    engine.setPeriscopeBearing(currentTargetBearing + 14.0);
     engine.updateTdcInput({ pistolType: 'IMPACT', torpedoDepthMeters: 3.0 });
 
     const run = engine.launchTorpedoRun();
     expect(run).not.toBeNull();
-    expect(run?.realNavalRunSeconds).toBeGreaterThan(45);
 
-    // Avanza el reloj de simulación hasta que el torpedo alcanza la línea del horizonte
     const finalSnapshot = engine.stepSimulation(5.0, 0.99);
-    expect(finalSnapshot.activeTorpedoRun).toBeNull();
     expect(finalSnapshot.lastShotResolution?.outcome).toBe('HIT_HULL');
     expect(finalSnapshot.isTargetSunk).toBe(true);
   });

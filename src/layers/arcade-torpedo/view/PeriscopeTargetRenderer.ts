@@ -1,14 +1,14 @@
 import type { RecognizedShipClass } from '../domain/ShipRecognitionManual.ts';
 import type { TorpedoArcadeStateSnapshot } from '../domain/TorpedoTypes.ts';
 
-// Dibuja el buque en movimiento, el marcador de adelanto TDC, la columna de agua de impacto y el hundimiento partido en V
+// Dibuja el buque en movimiento por el horizonte, su indicador de rumbo, la columna de agua de impacto y el hundimiento en V
 
 export const PERISCOPE_LENS_CENTER_X = 325;
 export const PERISCOPE_HORIZON_Y = 258;
-export const PIXELS_PER_BEARING_DEGREE = 8.5;
+export const PIXELS_PER_BEARING_DEGREE = 7.5;
 
 function computeForeshorteningFactor(angleDeg: number): number {
-  return 0.28 + 0.72 * Math.abs(Math.sin((angleDeg * Math.PI) / 180));
+  return 0.45 + 0.55 * Math.abs(Math.sin((angleDeg * Math.PI) / 180));
 }
 
 function drawSuperstructureByClass(
@@ -62,12 +62,12 @@ function drawDamageFireAndGeyser(
   const hitX = bowSign * hitRatio * realHalfWidth;
 
   if (lastShot !== null && lastShot.damageInflicted > 0 && snapshot.activeTorpedoRun === null) {
-    context.fillStyle = 'rgba(224, 251, 252, 0.85)';
+    context.fillStyle = 'rgba(224, 251, 252, 0.88)';
     context.beginPath();
-    context.moveTo(hitX - 14, PERISCOPE_HORIZON_Y + 2);
-    context.lineTo(hitX - 6, deckY - 52);
-    context.lineTo(hitX + 6, deckY - 52);
-    context.lineTo(hitX + 14, PERISCOPE_HORIZON_Y + 2);
+    context.moveTo(hitX - 15, PERISCOPE_HORIZON_Y + 2);
+    context.lineTo(hitX - 6, deckY - 54);
+    context.lineTo(hitX + 6, deckY - 54);
+    context.lineTo(hitX + 15, PERISCOPE_HORIZON_Y + 2);
     context.closePath();
     context.fill();
     context.fillStyle = '#ff9f1c';
@@ -77,7 +77,7 @@ function drawDamageFireAndGeyser(
   }
 
   if (snapshot.targetDamageTaken > 0) {
-    context.fillStyle = 'rgba(20, 26, 30, 0.78)';
+    context.fillStyle = 'rgba(20, 26, 30, 0.8)';
     context.beginPath();
     context.arc(hitX - bowSign * 8, deckY - 26, 12, 0, Math.PI * 2);
     context.arc(hitX - bowSign * 18, deckY - 44, 16, 0, Math.PI * 2);
@@ -134,14 +134,12 @@ export function renderTargetAndLeadMarker(
   context: CanvasRenderingContext2D,
   snapshot: TorpedoArcadeStateSnapshot,
 ): void {
-  const { firingContext, actualTargetEntry, currentInput, isTargetSunk } = snapshot;
+  const { firingContext, actualTargetEntry, isTargetSunk } = snapshot;
   const distanceScale = Math.max(0.45, Math.min(1.25, 1100 / firingContext.distanceMeters));
   const baseHalfWidth = (actualTargetEntry.lengthMeters * 0.9 * distanceScale) / 2;
   const realHalfWidth = baseHalfWidth * computeForeshorteningFactor(firingContext.targetAngleOnBowDeg);
-  const ghostHalfWidth = baseHalfWidth * computeForeshorteningFactor(currentInput.estimatedAobDeg);
   const bowSign = firingContext.targetBowSide === 'STARBOARD' ? 1 : -1;
   const shipScreenX = PERISCOPE_LENS_CENTER_X + (snapshot.targetBearingDeg - snapshot.periscopeBearingDeg) * PIXELS_PER_BEARING_DEGREE;
-  const leadScreenX = PERISCOPE_LENS_CENTER_X + (snapshot.tdcSuggestedBearingDeg - snapshot.periscopeBearingDeg) * PIXELS_PER_BEARING_DEGREE;
   const deckY = snapshot.targetDamageTaken > 0 ? PERISCOPE_HORIZON_Y - 8 : PERISCOPE_HORIZON_Y - 13;
 
   context.save();
@@ -177,23 +175,10 @@ export function renderTargetAndLeadMarker(
   context.lineWidth = 2;
   context.stroke();
 
-  context.strokeStyle = 'rgba(76, 201, 240, 0.55)';
-  context.lineWidth = 1.2;
-  context.setLineDash([4, 4]);
-  context.strokeRect(-ghostHalfWidth, deckY - 26, ghostHalfWidth * 2, 28);
-  context.setLineDash([]);
-  context.restore();
-
-  context.save();
+  // Flecha indicadora de dirección de avance sobre la proa para saber hacia qué lado adelantar el tiro
   context.fillStyle = '#4cc9f0';
-  context.beginPath();
-  context.moveTo(leadScreenX, PERISCOPE_HORIZON_Y - 38);
-  context.lineTo(leadScreenX - 6, PERISCOPE_HORIZON_Y - 48);
-  context.lineTo(leadScreenX + 6, PERISCOPE_HORIZON_Y - 48);
-  context.closePath();
-  context.fill();
-  context.font = 'bold 9px monospace';
+  context.font = 'bold 10px monospace';
   context.textAlign = 'center';
-  context.fillText('ADELANTO TDC', leadScreenX, PERISCOPE_HORIZON_Y - 53);
+  context.fillText(bowSign > 0 ? 'AVANCE ►' : '◄ AVANCE', bowSign * (realHalfWidth + 28), deckY - 6);
   context.restore();
 }
