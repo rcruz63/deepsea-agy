@@ -1,18 +1,12 @@
 import { advanceArmoryReloadTurn, canStartTorpedoReloadInArmory, findTorpedoTubeById, fireTorpedoTubeInArmory, startTorpedoReloadInArmory } from '../../../core/armory/index.ts';
 import type { EncounterResult, FiringSolutionContext, TorpedoArmoryState } from '../../../core/contracts/index.ts';
-import { MAX_TORPEDO_DEPTH_METERS, MIN_TORPEDO_DEPTH_METERS, advanceTargetHorizonBearing, calculateLeadAngleOffsetDeg, calculateTorpedoRunTimings, clampPeriscopeBearing, mergeAndClampTdcInput, normalizePeriscopeBroadsideAob, stepActiveTorpedoRun } from './PeriscopeKinematics.ts';
+import { MAX_TORPEDO_DEPTH_METERS, MIN_TORPEDO_DEPTH_METERS, advanceTargetHorizonBearing, calculateLeadAngleOffsetDeg, calculateSignedAngularDeltaDeg, calculateTorpedoRunTimings, clampPeriscopeBearing, findPreferredLoadedTubeForArc, isTubeCompatibleWithArc, mergeAndClampTdcInput, normalizePeriscopeBroadsideAob, normalizeRelativeBearingDeg, resolveActiveFiringArc, stepActiveTorpedoRun } from './PeriscopeKinematics.ts';
 import { type ShipRecognitionEntry, getShipRecognitionEntry, resolveActualShipRecognitionEntry } from './ShipRecognitionManual.ts';
 import { resolveTorpedoShot } from './TorpedoResolutionEngine.ts';
 import type { ActiveTorpedoRunState, TdcFiringInput, TorpedoArcadeStateSnapshot, TorpedoShotResolution } from './TorpedoTypes.ts';
 
-// Coordina la sesión de ataque en periscopio: giro de adelanto, carrera del torpedo, disparos múltiples y retorno a patrulla
-
+// Coordina el ataque en periscopio de 360°: arcos de proa/popa, timón del submarino, carrera del torpedo y retorno
 export { MIN_TORPEDO_DEPTH_METERS, MAX_TORPEDO_DEPTH_METERS };
-
-function findFirstLoadedTubeId(armory: TorpedoArmoryState): string {
-  const loaded = armory.bowTubes.find((t) => t.status === 'LOADED') ?? armory.sternTubes.find((t) => t.status === 'LOADED');
-  return loaded?.tubeId ?? 'BOW-1';
-}
 
 export class TorpedoArcadeEngine {
   private firingContext: FiringSolutionContext | null = null;
@@ -21,6 +15,7 @@ export class TorpedoArcadeEngine {
   private armory: TorpedoArmoryState | null = null;
   private periscopeBearingDeg = 0;
   private targetBearingDeg = 0;
+  private submarineHeadingOffsetDeg = 0;
   private hasManualBearingOverride = false;
   private activeTorpedoRun: ActiveTorpedoRunState | null = null;
   private targetDamageTaken = 0;
@@ -30,16 +25,8 @@ export class TorpedoArcadeEngine {
 
   public startAttack(context: FiringSolutionContext): void {
     const normalizedAob = normalizePeriscopeBroadsideAob(context.targetAngleOnBowDeg);
-    this.firingContext = {
-      ...context,
-      targetAngleOnBowDeg: normalizedAob,
-      trueAngleOnBowDegrees: normalizedAob,
-    };
-    this.actualTargetEntry = resolveActualShipRecognitionEntry(
-      context.targetShip.spec.specId,
-      context.targetShip.spec.draftMeters,
-      context.targetShip.spec.tonnage,
-    );
+    this.firingContext = { ...context, targetAngleOnBowDeg: normalizedAob, trueAngleOnBowDegrees: normalizedAob };
+    this.actualTargetEntry = resolveActualShipRecognitionEntry(context.targetShip.spec.specId, context.targetShip.spec.draftMeters, context.targetShip.spec.tonnage);
     this.armory = context.armory;
     this.targetDamageTaken = 0;
     this.sinkingProgress = 0;
@@ -47,10 +34,17 @@ export class TorpedoArcadeEngine {
     this.extraReloadTurnsElapsed = 0;
     this.activeTorpedoRun = null;
     this.hasManualBearingOverride = false;
-    this.targetBearingDeg = (context.targetBowSide === 'STARBOARD' ? -1 : 1) * 10;
+    this.submarineHeadingOffsetDeg = 0;
+
+    // Si viene del mapa táctico con marcación relativa real, la usa para que el blanco no aparezca siempre centrado en 0°
+    const defaultBearing = (context.targetBowSide === 'STARBOARD' ? -1 : 1) * 10;
+    this.targetBearingDeg =
+      context.submarineRelativeBearingDeg !== undefined && context.submarineRelativeBearingDeg !== 0
+        ? normalizeRelativeBearingDeg(context.submarineRelativeBearingDeg)
+        : defaultBearing;
     this.periscopeBearingDeg = 0;
     this.currentInput = {
-      selectedTubeId: findFirstLoadedTubeId(context.armory),
+      selectedTubeId: findPreferredLoadedTubeForArc(context.armory, resolveActiveFiringArc(0)),
       recognizedShipType: 'COASTAL_FREIGHTER',
       pistolType: 'IMPACT',
       torpedoDepthMeters: 3.5,
@@ -63,22 +57,18 @@ export class TorpedoArcadeEngine {
     const { context, input, actualEntry, armory } = this.assertInitialized();
     const tdcLeadOffset = calculateLeadAngleOffsetDeg(context.targetSpeedKnots, context.targetAngleOnBowDeg, context.targetBowSide);
     return {
-      firingContext: context,
-      currentInput: input,
+      firingContext: context, currentInput: input,
       recognizedManualEntry: getShipRecognitionEntry(input.recognizedShipType),
-      actualTargetEntry: actualEntry,
-      armory,
-      periscopeBearingDeg: this.periscopeBearingDeg,
-      targetBearingDeg: this.targetBearingDeg,
+      actualTargetEntry: actualEntry, armory,
+      periscopeBearingDeg: this.periscopeBearingDeg, targetBearingDeg: this.targetBearingDeg,
       tdcSuggestedBearingDeg: clampPeriscopeBearing(this.targetBearingDeg + tdcLeadOffset),
+      activeFiringArc: resolveActiveFiringArc(this.periscopeBearingDeg),
+      submarineHeadingOffsetDeg: this.submarineHeadingOffsetDeg,
       activeTorpedoRun: this.activeTorpedoRun,
-      targetDamageTaken: this.targetDamageTaken,
-      targetMaxHitPoints: actualEntry.maxHitPoints,
-      isTargetSunk: this.targetDamageTaken >= actualEntry.maxHitPoints,
-      sinkingProgress: this.sinkingProgress,
+      targetDamageTaken: this.targetDamageTaken, targetMaxHitPoints: actualEntry.maxHitPoints,
+      isTargetSunk: this.targetDamageTaken >= actualEntry.maxHitPoints, sinkingProgress: this.sinkingProgress,
       lastShotResolution: this.shotHistory.length > 0 ? this.shotHistory[this.shotHistory.length - 1]! : null,
-      shotHistory: this.shotHistory,
-      extraReloadTurnsElapsed: this.extraReloadTurnsElapsed,
+      shotHistory: this.shotHistory, extraReloadTurnsElapsed: this.extraReloadTurnsElapsed,
     };
   }
 
@@ -87,9 +77,28 @@ export class TorpedoArcadeEngine {
   }
 
   public setPeriscopeBearing(bearingDeg: number): TorpedoArcadeStateSnapshot {
-    this.assertInitialized();
+    const { input, armory } = this.assertInitialized();
     this.hasManualBearingOverride = true;
     this.periscopeBearingDeg = clampPeriscopeBearing(bearingDeg);
+    const nextArc = resolveActiveFiringArc(this.periscopeBearingDeg);
+    this.currentInput = { ...input, selectedTubeId: findPreferredLoadedTubeForArc(armory, nextArc, input.selectedTubeId) };
+    return this.getSnapshot();
+  }
+
+  // Virar el timón del submarino rota el casco respecto al mar, desplazando la marcación relativa del blanco
+  public steerSubmarine(deltaHeadingDeg: number): TorpedoArcadeStateSnapshot {
+    const { input, armory } = this.assertInitialized();
+    this.submarineHeadingOffsetDeg = normalizeRelativeBearingDeg(this.submarineHeadingOffsetDeg + deltaHeadingDeg);
+    this.targetBearingDeg = normalizeRelativeBearingDeg(this.targetBearingDeg - deltaHeadingDeg);
+    if (this.activeTorpedoRun !== null) {
+      this.activeTorpedoRun = {
+        ...this.activeTorpedoRun,
+        firedBearingDeg: normalizeRelativeBearingDeg(this.activeTorpedoRun.firedBearingDeg - deltaHeadingDeg),
+        targetArrivalBearingDeg: normalizeRelativeBearingDeg(this.activeTorpedoRun.targetArrivalBearingDeg - deltaHeadingDeg),
+      };
+    }
+    const currentArc = resolveActiveFiringArc(this.periscopeBearingDeg);
+    this.currentInput = { ...input, selectedTubeId: findPreferredLoadedTubeForArc(armory, currentArc, input.selectedTubeId) };
     return this.getSnapshot();
   }
 
@@ -106,19 +115,18 @@ export class TorpedoArcadeEngine {
 
   public launchTorpedoRun(): ActiveTorpedoRunState | null {
     const { context, input, actualEntry, armory } = this.assertInitialized();
-    if (this.activeTorpedoRun !== null || this.targetDamageTaken >= actualEntry.maxHitPoints || findTorpedoTubeById(armory, input.selectedTubeId)?.status !== 'LOADED') {
+    const activeArc = resolveActiveFiringArc(this.periscopeBearingDeg);
+    const selectedTube = findTorpedoTubeById(armory, input.selectedTubeId);
+    if (this.activeTorpedoRun !== null || this.targetDamageTaken >= actualEntry.maxHitPoints || selectedTube?.status !== 'LOADED' || !isTubeCompatibleWithArc(input.selectedTubeId, activeArc)) {
       return null;
     }
-    const { realNavalRunSeconds, totalScreenSeconds } = calculateTorpedoRunTimings(context.distanceMeters, this.periscopeBearingDeg - this.targetBearingDeg);
+    const aimOffsetDeg = calculateSignedAngularDeltaDeg(this.targetBearingDeg, this.periscopeBearingDeg);
+    const { realNavalRunSeconds, totalScreenSeconds } = calculateTorpedoRunTimings(context.distanceMeters, aimOffsetDeg);
     const requiredLeadDeg = calculateLeadAngleOffsetDeg(context.targetSpeedKnots, context.targetAngleOnBowDeg, context.targetBowSide);
     this.activeTorpedoRun = {
-      tubeId: input.selectedTubeId,
-      firedBearingDeg: this.periscopeBearingDeg,
-      targetArrivalBearingDeg: this.targetBearingDeg + requiredLeadDeg,
-      elapsedScreenSeconds: 0,
-      totalScreenSeconds,
-      realNavalRunSeconds,
-      progress: 0,
+      tubeId: input.selectedTubeId, firedBearingDeg: this.periscopeBearingDeg,
+      targetArrivalBearingDeg: normalizeRelativeBearingDeg(this.targetBearingDeg + requiredLeadDeg),
+      elapsedScreenSeconds: 0, totalScreenSeconds, realNavalRunSeconds, progress: 0,
     };
     return this.activeTorpedoRun;
   }
@@ -135,7 +143,7 @@ export class TorpedoArcadeEngine {
       this.activeTorpedoRun = stepped.updatedRun;
       if (stepped.updatedRun.progress >= 1) {
         this.activeTorpedoRun = null;
-        this.commitTorpedoImpact(randomRoll, stepped.updatedRun.firedBearingDeg - stepped.startTargetBearingDeg);
+        this.commitTorpedoImpact(randomRoll, calculateSignedAngularDeltaDeg(stepped.startTargetBearingDeg, stepped.updatedRun.firedBearingDeg));
       }
       return this.getSnapshot();
     }
@@ -144,7 +152,8 @@ export class TorpedoArcadeEngine {
   }
 
   public fireSelectedTorpedo(randomRoll = 0.5): TorpedoShotResolution {
-    return this.commitTorpedoImpact(randomRoll, this.hasManualBearingOverride ? this.periscopeBearingDeg - this.targetBearingDeg : undefined);
+    const manualOffset = this.hasManualBearingOverride ? calculateSignedAngularDeltaDeg(this.targetBearingDeg, this.periscopeBearingDeg) : undefined;
+    return this.commitTorpedoImpact(randomRoll, manualOffset);
   }
 
   private commitTorpedoImpact(randomRoll: number, manualAimOffsetDeg?: number): TorpedoShotResolution {
@@ -163,7 +172,7 @@ export class TorpedoArcadeEngine {
       this.sinkingProgress = 0.25;
     }
     this.shotHistory = [...this.shotHistory, resolution];
-    this.currentInput = { ...input, selectedTubeId: findFirstLoadedTubeId(nextArmory) };
+    this.currentInput = { ...input, selectedTubeId: findPreferredLoadedTubeForArc(nextArmory, resolveActiveFiringArc(this.periscopeBearingDeg)) };
     return resolution;
   }
 
@@ -171,21 +180,14 @@ export class TorpedoArcadeEngine {
     const { input, armory } = this.assertInitialized();
     this.armory = advanceArmoryReloadTurn(armory);
     this.extraReloadTurnsElapsed += 1;
-    this.currentInput = { ...input, selectedTubeId: findFirstLoadedTubeId(this.armory) };
+    this.currentInput = { ...input, selectedTubeId: findPreferredLoadedTubeForArc(this.armory, resolveActiveFiringArc(this.periscopeBearingDeg)) };
     return this.getSnapshot();
   }
 
   public buildEncounterResult(baseTacticalTurns = 1): EncounterResult {
     const s = this.getSnapshot();
-    return {
-      contactId: s.firingContext.contactId,
-      outcome: s.isTargetSunk ? 'TARGET_SUNK' : 'DISENGAGED',
-      updatedArmory: s.armory,
-      hullDamageTaken: 0,
-      isTargetSunk: s.isTargetSunk,
-      sunkTonnageAwarded: s.isTargetSunk ? s.actualTargetEntry.tonnage : 0,
-      tacticalTurnsElapsed: baseTacticalTurns + this.extraReloadTurnsElapsed,
-    };
+    const outcome = s.isTargetSunk ? 'TARGET_SUNK' : 'DISENGAGED';
+    return { contactId: s.firingContext.contactId, outcome, updatedArmory: s.armory, hullDamageTaken: 0, isTargetSunk: s.isTargetSunk, sunkTonnageAwarded: s.isTargetSunk ? s.actualTargetEntry.tonnage : 0, tacticalTurnsElapsed: baseTacticalTurns + this.extraReloadTurnsElapsed };
   }
 
   private assertInitialized() {

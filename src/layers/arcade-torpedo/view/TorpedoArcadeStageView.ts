@@ -17,7 +17,7 @@ import {
   renderTdcControlPanel,
 } from './TdcControlPanelRenderer.ts';
 
-// Coordina la vista del periscopio en tiempo real: bucle de animación, giro por lente/teclado y carrera del torpedo
+// Coordina la vista del periscopio de 360°: bucle de animación, giro de lente (A/D), timón del submarino (Q/E) y disparo
 
 function isPointInsideRegion(point: Point2D, region: TdcControlRegion): boolean {
   return (
@@ -62,10 +62,16 @@ export class TorpedoArcadeStageView {
         return;
       }
       if (event.key === 'ArrowLeft' || event.key === 'a' || event.key === 'A') {
-        this.engine.rotatePeriscope(-1.5);
+        this.engine.rotatePeriscope(-2.5);
         this.onRequestRedraw?.();
       } else if (event.key === 'ArrowRight' || event.key === 'd' || event.key === 'D') {
-        this.engine.rotatePeriscope(1.5);
+        this.engine.rotatePeriscope(2.5);
+        this.onRequestRedraw?.();
+      } else if (event.key === 'q' || event.key === 'Q') {
+        this.engine.steerSubmarine(-8);
+        this.onRequestRedraw?.();
+      } else if (event.key === 'e' || event.key === 'E') {
+        this.engine.steerSubmarine(8);
         this.onRequestRedraw?.();
       } else if (event.key === ' ') {
         event.preventDefault();
@@ -102,7 +108,6 @@ export class TorpedoArcadeStageView {
   }
 
   public handlePointerClick(canvasPoint: Point2D): void {
-    // Hacer clic dentro de la lente gira el periscopio directamente hacia el punto clicado para adelantar el tiro
     if (isPointInsidePeriscopeLens(canvasPoint)) {
       const currentBearing = this.engine.getSnapshot().periscopeBearingDeg;
       const deltaDeg = (canvasPoint.x - PERISCOPE_LENS_CENTER_X) / PIXELS_PER_BEARING_DEGREE;
@@ -124,6 +129,10 @@ export class TorpedoArcadeStageView {
 
     if (actionId.startsWith('ROTATE_PERISCOPE:')) {
       this.engine.rotatePeriscope(Number(actionId.slice('ROTATE_PERISCOPE:'.length)));
+      return;
+    }
+    if (actionId.startsWith('STEER_SUBMARINE:')) {
+      this.engine.steerSubmarine(Number(actionId.slice('STEER_SUBMARINE:'.length)));
       return;
     }
     if (actionId.startsWith('SET_CLASS:')) {

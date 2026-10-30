@@ -105,11 +105,16 @@ Recursos `fuel` y `battery` acotados en `[0, 100]`. La costa (`LAND`) es intrans
 | `LIBERTY_CARGO` | Mercante Estándar | `135m` | `7.5m` | `7100` | `2` | Superestructura central, 2 mástiles. |
 | `T2_TANKER` | Petrolero Oceánico | `160m` | `9.5m` | `10500` | `2` | Puente a proa, pasarela larga, chimenea a popa. |
 
-### 6.2. Giro del Periscopio (Adelanto del Tiro) y Parámetros del TDC (`TdcFiringInput`)
-- **Movimiento Lateral en Tiempo Real y Adelanto (*Lead Angle*):**
-  - El mercante navega horizontalmente por el horizonte en la dirección de su proa (`STARBOARD` = izquierda a derecha; `PORT` = derecha a izquierda) a una velocidad angular proporcional a `targetSpeedKnots * sin(targetAngleOnBowDeg) / distanceMeters`.
-  - El jugador **gira el periscopio** (`periscopeBearingDeg` en `[-35°, +35°]`) mediante teclado (`A`/`D` o `◄`/`►`), clic en la lente o botones del panel para **adelantar la retícula vertical por delante de la proa del buque**.
-  - Al introducir `estimatedSpeedKnots` y `estimatedAobDeg` en el TDC, el calculador proyecta un **marcador guía de adelanto (`TDC LEAD`)** delante de la proa indicando dónde debe apuntarse el hilo central para compensar el movimiento del blanco.
+### 6.2. Periscopio de `360°`, Arcos de Tiro (`BOW` vs `STERN`), Timón y Carrera del Torpedo
+- **Marcación Inicial Desviada (`submarineRelativeBearingDeg`):**
+  - Al emerger a cota de periscopio desde el mapa táctico `15x15`, la posición angular inicial del mercante depende del rumbo real del submarino respecto al blanco más una desviación de escucha acústica (`±25°..±55°`), por lo que el objetivo no aparece siempre centrado en `0°` (puede aparecer en una banda lateral o por la popa si el mercante rebasó al submarino).
+- **Periscopio de `360°` (`-180°..+180°`) y Arcos de Fuego por Montaje:**
+  - `0°` corresponde a la **Proa del Submarino** y `±180°` a la **Popa del Submarino**.
+  - **Arco de Proa (`BOW`, `|periscopeBearingDeg| <= 45°`):** Giroscopio frontal; habilita exclusivamente los **4 tubos de proa (`BOW-1..4`)**.
+  - **Arco de Popa (`STERN`, `|periscopeBearingDeg| >= 135°`):** Giroscopio trasero; habilita exclusivamente el **tubo de popa (`STERN-1`)**.
+  - **Zona Muerta del Través (`DEAD_ZONE`, `45° < |periscopeBearingDeg| < 135°`):** Ningún tubo puede disparar de costado; el jugador debe virar el submarino con el timón o esperar a que el blanco entre en arco.
+- **Timón del Submarino (`steerSubmarine` — Teclas `Q` / `E`):**
+  - Permite virar la proa del submarino a Babor (`-8°`) o Estribor (`+8°`) desde la propia vista de periscopio para meter al contacto dentro del arco de proa (`BOW`) o presentarle la popa para disparar `STERN-1`.
 - **Tiempo de Carrera del Torpedo (`torpedoRunSeconds`):**
   - La velocidad del torpedo es de `40 nudos` (`~20.58 m/s`).
   - La distancia efectiva recorrida según el ángulo de adelanto $\theta$ es $d_{\text{eff}} = \text{distanceMeters} / \cos(\theta)$, por lo que el tiempo real de carrera es $T_{\text{naval}} = d_{\text{eff}} / 20.58\text{ s}$ (`~24s` a `500m` hasta `~98s` a `2000m`), comprimido visualmente en una carrera animada de `1.4s` a `4.2s` durante la cual el torpedo y el buque avanzan simultáneamente hacia el punto de encuentro.

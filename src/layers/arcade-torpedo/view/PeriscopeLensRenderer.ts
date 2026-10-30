@@ -1,7 +1,5 @@
-import type {
-  TorpedoArcadeStateSnapshot,
-  TorpedoShotResolution,
-} from '../domain/TorpedoTypes.ts';
+import { calculateSignedAngularDeltaDeg, resolveActiveFiringArc } from '../domain/PeriscopeKinematics.ts';
+import type { TorpedoArcadeStateSnapshot, TorpedoShotResolution } from '../domain/TorpedoTypes.ts';
 import {
   PERISCOPE_HORIZON_Y,
   PERISCOPE_LENS_CENTER_X,
@@ -9,49 +7,46 @@ import {
   renderTargetAndLeadMarker,
 } from './PeriscopeTargetRenderer.ts';
 
-// Dibuja la óptica del periscopio, la escala graduada giratoria, la carrera en vivo del torpedo y la telemetría posdisparo
+// Dibuja la óptica de 360°, los arcos de fuego de proa (verde) y popa (cian), la carrera del torpedo y la telemetría
 
 export const PERISCOPE_LENS_CENTER_Y = 245;
 export const PERISCOPE_LENS_RADIUS = 205;
 
-function renderBearingScale(
-  context: CanvasRenderingContext2D,
-  periscopeBearingDeg: number,
-): void {
-  context.fillStyle = '#63f5c4';
-  context.strokeStyle = 'rgba(99, 245, 196, 0.5)';
+function renderBearingScale(context: CanvasRenderingContext2D, periscopeBearingDeg: number): void {
   context.font = '9px monospace';
   context.textAlign = 'center';
 
-  for (let deg = -55; deg <= 55; deg += 5) {
-    const screenX =
-      PERISCOPE_LENS_CENTER_X + (deg - periscopeBearingDeg) * PIXELS_PER_BEARING_DEGREE;
+  for (let deg = -180; deg < 180; deg += 5) {
+    const deltaDeg = calculateSignedAngularDeltaDeg(periscopeBearingDeg, deg);
+    const screenX = PERISCOPE_LENS_CENTER_X + deltaDeg * PIXELS_PER_BEARING_DEGREE;
     if (screenX < PERISCOPE_LENS_CENTER_X - 185 || screenX > PERISCOPE_LENS_CENTER_X + 185) {
       continue;
     }
+    const arc = resolveActiveFiringArc(deg);
+    const color = arc === 'BOW' ? '#00ffaa' : arc === 'STERN' ? '#4cc9f0' : '#ef476f';
     const tickHeight = deg % 10 === 0 ? 10 : 5;
+
+    context.strokeStyle = color;
+    context.fillStyle = color;
     context.beginPath();
     context.moveTo(screenX, PERISCOPE_HORIZON_Y - tickHeight);
     context.lineTo(screenX, PERISCOPE_HORIZON_Y + tickHeight);
     context.stroke();
-    if (deg % 10 === 0) {
-      context.fillText(`${deg > 0 ? `+${deg}` : deg}°`, screenX, PERISCOPE_HORIZON_Y + 22);
+    if (deg % 15 === 0) {
+      const label = deg === 0 ? 'PROA 0°' : Math.abs(deg) === 180 ? 'POPA 180°' : `${deg > 0 ? `+${deg}` : deg}°`;
+      context.fillText(label, screenX, PERISCOPE_HORIZON_Y + 22);
     }
   }
 }
 
-function renderActiveTorpedoWake(
-  context: CanvasRenderingContext2D,
-  snapshot: TorpedoArcadeStateSnapshot,
-): void {
+function renderActiveTorpedoWake(context: CanvasRenderingContext2D, snapshot: TorpedoArcadeStateSnapshot): void {
   const run = snapshot.activeTorpedoRun;
   if (run === null) {
     return;
   }
 
-  const torpedoScreenX =
-    PERISCOPE_LENS_CENTER_X +
-    (run.firedBearingDeg - snapshot.periscopeBearingDeg) * PIXELS_PER_BEARING_DEGREE;
+  const deltaDeg = calculateSignedAngularDeltaDeg(snapshot.periscopeBearingDeg, run.firedBearingDeg);
+  const torpedoScreenX = PERISCOPE_LENS_CENTER_X + deltaDeg * PIXELS_PER_BEARING_DEGREE;
   const startY = PERISCOPE_LENS_CENTER_Y + PERISCOPE_LENS_RADIUS;
   const wakeY = startY - run.progress * (startY - PERISCOPE_HORIZON_Y);
 
@@ -69,10 +64,7 @@ function renderActiveTorpedoWake(
   context.arc(torpedoScreenX, wakeY, 3.5, 0, Math.PI * 2);
   context.fill();
 
-  const remainingNavalSeconds = Math.max(
-    0,
-    run.realNavalRunSeconds * (1 - run.progress),
-  ).toFixed(1);
+  const remainingNavalSeconds = Math.max(0, run.realNavalRunSeconds * (1 - run.progress)).toFixed(1);
   context.fillStyle = '#ffd166';
   context.font = 'bold 12px monospace';
   context.textAlign = 'center';
@@ -88,8 +80,7 @@ function renderShotTelemetryBox(
   snapshot: TorpedoArcadeStateSnapshot,
   shot: TorpedoShotResolution | null,
 ): void {
-  const { targetDamageTaken, targetMaxHitPoints, firingContext } = snapshot;
-  const hullImpactAngleDeg = 90 - Math.abs(90 - firingContext.targetAngleOnBowDeg);
+  const { targetDamageTaken, targetMaxHitPoints, activeFiringArc } = snapshot;
 
   context.strokeStyle = '#1f544c';
   context.fillStyle = '#061319';
@@ -100,17 +91,19 @@ function renderShotTelemetryBox(
   if (shot === null) {
     context.fillStyle = '#63f5c4';
     context.font = 'bold 12px monospace';
-    context.fillText('CÓMO APUNTAR CON ADELANTO EN EL PERISCOPIO', 34, 504);
+    context.fillText('ARCOS DE FUEGO DE PROA (±45°) Y POPA (±135°..180°) + TIMÓN', 34, 504);
     context.font = '11px monospace';
     context.fillStyle = '#a8dadc';
-    context.fillText('1. Identifica el barco por su silueta y selecciona su clase a la derecha para ver su Calado.', 34, 526);
-    context.fillText('2. Gira el periscopio (clic en la lente o teclas A/D) para situar el hilo central DELANTE de su proa.', 34, 546);
-    context.fillStyle = '#00ffaa';
-    context.fillText(
-      `3. Ángulo de incidencia en casco: ${hullImpactAngleDeg}° (ÓPTIMO para espoleta de IMPACTO o MAGNÉTICA).`,
-      34,
-      568,
-    );
+    context.fillText('• Sector VERDE (-45°..+45°): Tubos de Proa (BOW-1..4) | Sector CIAN (±135°..180°): Popa (STERN-1).', 34, 526);
+    context.fillText('• Si el barco está en zona lateral ROJA, usa TIMÓN BABOR [Q] / ESTRIBOR [E] para virar el submarino.', 34, 546);
+    context.fillStyle = activeFiringArc === 'DEAD_ZONE' ? '#ef476f' : '#00ffaa';
+    const arcStatusText =
+      activeFiringArc === 'BOW'
+        ? '• Sector actual: ARCO DE PROA HABILITADO (Tubos BOW-1 a BOW-4 listos)'
+        : activeFiringArc === 'STERN'
+          ? '• Sector actual: ARCO DE POPA HABILITADO (Tubo trasero STERN-1 listo)'
+          : '• ¡FUERA DE ARCO!: Gira el periscopio a Proa/Popa o vira el submarino con Q / E.';
+    context.fillText(arcStatusText, 34, 568);
     context.fillStyle = '#ffd166';
     context.fillText(`INTEGRIDAD DEL BLANCO: ${targetMaxHitPoints - targetDamageTaken}/${targetMaxHitPoints} HP`, 34, 602);
     return;
@@ -139,10 +132,7 @@ function renderShotTelemetryBox(
   );
 }
 
-export function renderPeriscopeLensView(
-  context: CanvasRenderingContext2D,
-  snapshot: TorpedoArcadeStateSnapshot,
-): void {
+export function renderPeriscopeLensView(context: CanvasRenderingContext2D, snapshot: TorpedoArcadeStateSnapshot): void {
   context.fillStyle = '#030a0e';
   context.fillRect(0, 0, 645, 640);
 
@@ -160,8 +150,10 @@ export function renderPeriscopeLensView(
   renderBearingScale(context, snapshot.periscopeBearingDeg);
   renderActiveTorpedoWake(context, snapshot);
 
-  context.strokeStyle = 'rgba(0, 255, 170, 0.55)';
-  context.lineWidth = 1.2;
+  const wireColor =
+    snapshot.activeFiringArc === 'BOW' ? 'rgba(0, 255, 170, 0.65)' : snapshot.activeFiringArc === 'STERN' ? 'rgba(76, 201, 240, 0.7)' : 'rgba(239, 71, 111, 0.65)';
+  context.strokeStyle = wireColor;
+  context.lineWidth = 1.3;
   context.beginPath();
   context.moveTo(PERISCOPE_LENS_CENTER_X - PERISCOPE_LENS_RADIUS, PERISCOPE_HORIZON_Y);
   context.lineTo(PERISCOPE_LENS_CENTER_X + PERISCOPE_LENS_RADIUS, PERISCOPE_HORIZON_Y);
@@ -172,20 +164,17 @@ export function renderPeriscopeLensView(
 
   context.beginPath();
   context.arc(PERISCOPE_LENS_CENTER_X, PERISCOPE_LENS_CENTER_Y, PERISCOPE_LENS_RADIUS, 0, Math.PI * 2);
-  context.strokeStyle = '#246a5e';
+  context.strokeStyle = snapshot.activeFiringArc === 'DEAD_ZONE' ? '#ef476f' : '#246a5e';
   context.lineWidth = 4;
   context.stroke();
 
   const bearingText = snapshot.periscopeBearingDeg > 0 ? `+${snapshot.periscopeBearingDeg.toFixed(1)}°` : `${snapshot.periscopeBearingDeg.toFixed(1)}°`;
   const shipPosText = snapshot.targetBearingDeg > 0 ? `+${snapshot.targetBearingDeg.toFixed(1)}°` : `${snapshot.targetBearingDeg.toFixed(1)}°`;
-  context.fillStyle = '#00ffaa';
+  const arcBadge = snapshot.activeFiringArc === 'BOW' ? 'ARCO PROA' : snapshot.activeFiringArc === 'STERN' ? 'ARCO POPA' : 'ZONA MUERTA';
+  context.fillStyle = snapshot.activeFiringArc === 'DEAD_ZONE' ? '#ef476f' : '#00ffaa';
   context.font = 'bold 12px monospace';
   context.textAlign = 'center';
-  context.fillText(
-    `DISTANCIA: ${snapshot.firingContext.distanceMeters}m | BARCO EN: ${shipPosText} | PERISCOPIO EN: ${bearingText}`,
-    PERISCOPE_LENS_CENTER_X,
-    24,
-  );
+  context.fillText(`DIST: ${snapshot.firingContext.distanceMeters}m | BARCO: ${shipPosText} | LENTE: ${bearingText} [${arcBadge}]`, PERISCOPE_LENS_CENTER_X, 24);
 
   renderShotTelemetryBox(context, snapshot, snapshot.lastShotResolution);
 }

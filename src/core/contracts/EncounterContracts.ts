@@ -34,6 +34,7 @@ export interface FiringSolutionContext {
   readonly targetBowSide: TargetBowSide;
   readonly targetSpeedKnots: number;
   readonly hullIntegrityAtPeriscope: number;
+  readonly submarineRelativeBearingDeg?: number;
 }
 
 export type EncounterOutcomeReason =

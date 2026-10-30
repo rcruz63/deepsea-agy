@@ -104,6 +104,23 @@ export function buildTacticalFiringSolutionContext(
   difficulty: DifficultyConfig,
   telemetry: TacticalGeometryTelemetry,
 ): FiringSolutionContext {
+  const submarineBowNeighbor = getHexNeighbor(
+    submarine.coordinate,
+    submarine.heading,
+  );
+  const submarineCourseDeg = calculateNavalBearingDegrees(
+    submarine.coordinate,
+    submarineBowNeighbor,
+  );
+  const bearingSubmarineToMerchantDeg = calculateNavalBearingDegrees(
+    submarine.coordinate,
+    merchant.coordinate,
+  );
+  // Marcación relativa en [-180°, +180°): 0° = proa del submarino, ±180° = popa del submarino
+  const submarineRelativeBearingDeg = Math.round(
+    ((bearingSubmarineToMerchantDeg - submarineCourseDeg + 540) % 360) - 180,
+  );
+
   return {
     contactId: merchant.contactId,
     armory: submarine.armory,
@@ -121,5 +138,6 @@ export function buildTacticalFiringSolutionContext(
     targetBowSide: telemetry.targetBowSide,
     targetSpeedKnots: merchant.speedKnots,
     hullIntegrityAtPeriscope: submarine.hullIntegrity,
+    submarineRelativeBearingDeg,
   };
 }

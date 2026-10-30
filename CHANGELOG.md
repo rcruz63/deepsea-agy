@@ -7,6 +7,12 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
 
 ## [Unreleased]
 
+### Added
+- **Periscopio de 360°, Arcos de Tiro de Proa/Popa y Timón del Submarino (`src/layers/arcade-torpedo/`, `src/layers/tactical/`):**
+  - Cálculo de la marcación relativa real `submarineRelativeBearingDeg` (`[-180°, +180°)`) en `TacticalFiringGeometry.ts` según la orientación hexagonal del submarino al subir el periscopio, haciendo que el mercante aparezca en proa, través o popa según la aproximación táctica real.
+  - Periscopio circular continuo de `360°` (`PeriscopeKinematics.ts`) con arcos de giroscopio reales: **Arco de Proa (`BOW`, `±45°`)** exclusivo para `BOW-1..4`, **Arco de Popa (`STERN`, `±135°..180°`)** exclusivo para `STERN-1`, y **Zona Muerta Lateral (`DEAD_ZONE`, `45°..135°`)** con bloqueo de disparo.
+  - Control de timón del submarino (`steerSubmarine`, teclas `Q`/`E` y botones de consola) en `TorpedoArcadeEngine.ts`, `TdcControlPanelRenderer.ts` y `TorpedoArcadeStageView.ts` para virar el casco durante el periscopio y alinear los tubos delanteros o traseros.
+
 ### Changed
 - **Simplificación de la Consola de Periscopio y Corrección de Geometría de Impacto (`src/layers/arcade-torpedo/`):**
   - Eliminados los botones redundantes de velocidad estimada, AOB estimado y caja fantasma en `TdcControlPanelRenderer.ts` y `PeriscopeTargetRenderer.ts`.

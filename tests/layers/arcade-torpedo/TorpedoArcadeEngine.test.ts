@@ -9,6 +9,7 @@ function createFiringContextForClass(
   tonnage: number,
   draftMeters: number,
   rawAobDeg = 90,
+  submarineRelativeBearingDeg?: number,
 ): FiringSolutionContext {
   const difficulty = getDifficultyConfig('NORMAL');
   return {
@@ -35,17 +36,19 @@ function createFiringContextForClass(
     targetBowSide: 'STARBOARD',
     targetSpeedKnots: 10,
     hullIntegrityAtPeriscope: 100,
+    ...(submarineRelativeBearingDeg !== undefined
+      ? { submarineRelativeBearingDeg }
+      : {}),
   };
 }
 
-describe('TorpedoArcadeEngine (Periscope Lead Aiming, Torpedo Run & Multi-Shot)', () => {
+describe('TorpedoArcadeEngine (360° Periscope Arcs, Rudder Steering & Torpedo Run)', () => {
   it('damages a 2-HP LIBERTY_CARGO with an off-center HIT_HULL (1/2) and sinks it with a second shot', () => {
     const engine = new TorpedoArcadeEngine();
     engine.startAttack(
       createFiringContextForClass('LIBERTY_CARGO', 7100, 7.5),
     );
 
-    // Disparo ligeramente adelantado (+40m, hacia proa) con cota 4.5m -> 1/2 de daño
     engine.updateTdcInput({
       pistolType: 'IMPACT',
       torpedoDepthMeters: 4.5,
@@ -62,19 +65,15 @@ describe('TorpedoArcadeEngine (Periscope Lead Aiming, Torpedo Run & Multi-Shot)'
     expect(afterFirstSnapshot.isTargetSunk).toBe(false);
     expect(afterFirstSnapshot.currentInput.selectedTubeId).toBe('BOW-2');
 
-    // Segundo disparo con BOW-2 a cota 3.0m -> 2/2 de daño -> HUNDIDO
     engine.updateTdcInput({ torpedoDepthMeters: 3.0 });
     const secondShot = engine.fireSelectedTorpedo(0.99);
     expect(secondShot.outcome).toBe('HIT_HULL');
-
-    const afterSecondSnapshot = engine.getSnapshot();
-    expect(afterSecondSnapshot.isTargetSunk).toBe(true);
+    expect(engine.getSnapshot().isTargetSunk).toBe(true);
     expect(engine.buildEncounterResult().sunkTonnageAwarded).toBe(7100);
   });
 
   it('normalizes bow/stern tactical angles (0°/180°) so IMPACT torpedoes at 4.5m, 3m, and 2m always detonate', () => {
     const engine = new TorpedoArcadeEngine();
-    // Incluso entrando con AOB = 0° desde la misma fila r=7 del mapa táctico, el periscopio garantiza ángulo óptimo de través
     engine.startAttack(
       createFiringContextForClass('COASTAL_FREIGHTER', 2500, 4.5, 0),
     );
@@ -87,14 +86,13 @@ describe('TorpedoArcadeEngine (Periscope Lead Aiming, Torpedo Run & Multi-Shot)'
       initialSnapshot.firingContext.difficulty.impactAngleToleranceDegrees,
     );
 
-    // Avanza el barco durante 25 segundos mientras el jugador gira el periscopio a +30°: verifica que NO se teletransporta a la izquierda
+    // El barco gira en 360° sin teletransportarse jamás al superar +30°
     engine.setPeriscopeBearing(30);
     for (let step = 0; step < 25; step += 1) {
       engine.stepSimulation(1.0);
     }
     expect(engine.getSnapshot().targetBearingDeg).toBeGreaterThan(0);
 
-    // Apunta con adelanto delante de la proa (+14°) y lanza con espoleta de IMPACTO a 3.0m de profundidad
     const currentTargetBearing = engine.getSnapshot().targetBearingDeg;
     engine.setPeriscopeBearing(currentTargetBearing + 14.0);
     engine.updateTdcInput({ pistolType: 'IMPACT', torpedoDepthMeters: 3.0 });
@@ -105,5 +103,35 @@ describe('TorpedoArcadeEngine (Periscope Lead Aiming, Torpedo Run & Multi-Shot)'
     const finalSnapshot = engine.stepSimulation(5.0, 0.99);
     expect(finalSnapshot.lastShotResolution?.outcome).toBe('HIT_HULL');
     expect(finalSnapshot.isTargetSunk).toBe(true);
+  });
+
+  it('enforces BOW (±45°), DEAD_ZONE, and STERN (±135°..180°) arcs and lets steerSubmarine align the target', () => {
+    const engine = new TorpedoArcadeEngine();
+    // El contacto aparece en marcación +60° (zona muerta lateral de estribor) desde el mapa táctico
+    engine.startAttack(
+      createFiringContextForClass('COASTAL_FREIGHTER', 2500, 4.5, 90, 60),
+    );
+
+    expect(engine.getSnapshot().targetBearingDeg).toBe(60);
+
+    // Si giramos el periscopio a +74° para apuntar al barco en la zona lateral, estamos en DEAD_ZONE y el disparo se bloquea
+    engine.setPeriscopeBearing(74);
+    expect(engine.getSnapshot().activeFiringArc).toBe('DEAD_ZONE');
+    expect(engine.launchTorpedoRun()).toBeNull();
+
+    // Si giramos a popa (160°), se habilita automáticamente STERN-1 y se bloquean los tubos de proa
+    engine.setPeriscopeBearing(160);
+    expect(engine.getSnapshot().activeFiringArc).toBe('STERN');
+    expect(engine.getSnapshot().currentInput.selectedTubeId).toBe('STERN-1');
+
+    // Viramos el timón del submarino +40° a estribor: el barco pasa de +60° a +20° (dentro del arco de proa ±45°)
+    engine.steerSubmarine(40);
+    expect(engine.getSnapshot().targetBearingDeg).toBe(20);
+
+    // Apuntamos a +34° (dentro del arco de proa BOW ±45°): ahora se selecciona BOW-1 y el torpedo puede dispararse
+    engine.setPeriscopeBearing(34);
+    expect(engine.getSnapshot().activeFiringArc).toBe('BOW');
+    expect(engine.getSnapshot().currentInput.selectedTubeId).toBe('BOW-1');
+    expect(engine.launchTorpedoRun()).not.toBeNull();
   });
 });

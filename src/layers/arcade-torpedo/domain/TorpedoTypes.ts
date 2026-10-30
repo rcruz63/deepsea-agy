@@ -7,9 +7,11 @@ import type {
   ShipRecognitionEntry,
 } from './ShipRecognitionManual.ts';
 
-// Define los contratos de entrada del TDC, giro de adelanto del periscopio, carrera del torpedo y telemetría posdisparo
+// Define los contratos del TDC, giro 360° del periscopio, arcos de tiro (proa/popa), carrera del torpedo y telemetría
 
 export type TorpedoPistolType = 'IMPACT' | 'MAGNETIC';
+
+export type PeriscopeFiringArc = 'BOW' | 'STERN' | 'DEAD_ZONE';
 
 export type TorpedoShotOutcomeType =
   | 'HIT_KEEL_MAGNETIC'
@@ -62,6 +64,8 @@ export interface TorpedoArcadeStateSnapshot {
   readonly periscopeBearingDeg: number;
   readonly targetBearingDeg: number;
   readonly tdcSuggestedBearingDeg: number;
+  readonly activeFiringArc: PeriscopeFiringArc;
+  readonly submarineHeadingOffsetDeg: number;
   readonly activeTorpedoRun: ActiveTorpedoRunState | null;
   readonly targetDamageTaken: number;
   readonly targetMaxHitPoints: number;

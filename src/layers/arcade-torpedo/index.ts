@@ -7,6 +7,7 @@ export {
 } from './domain/ShipRecognitionManual.ts';
 export type {
   ActiveTorpedoRunState,
+  PeriscopeFiringArc,
   TdcFiringInput,
   TorpedoArcadeStateSnapshot,
   TorpedoPistolType,
@@ -14,12 +15,19 @@ export type {
   TorpedoShotResolution,
 } from './domain/TorpedoTypes.ts';
 export {
-  MAX_PERISCOPE_BEARING_DEG,
+  BOW_ARC_LIMIT_DEG,
+  STERN_ARC_MIN_DEG,
   TORPEDO_SPEED_KNOTS,
   advanceTargetHorizonBearing,
   calculateLeadAngleOffsetDeg,
+  calculateSignedAngularDeltaDeg,
   calculateTorpedoRunTimings,
   clampPeriscopeBearing,
+  findPreferredLoadedTubeForArc,
+  isTubeCompatibleWithArc,
+  normalizePeriscopeBroadsideAob,
+  normalizeRelativeBearingDeg,
+  resolveActiveFiringArc,
   stepActiveTorpedoRun,
 } from './domain/PeriscopeKinematics.ts';
 export {

@@ -1,7 +1,8 @@
+import { calculateSignedAngularDeltaDeg } from '../domain/PeriscopeKinematics.ts';
 import type { RecognizedShipClass } from '../domain/ShipRecognitionManual.ts';
 import type { TorpedoArcadeStateSnapshot } from '../domain/TorpedoTypes.ts';
 
-// Dibuja el buque en movimiento por el horizonte, su indicador de rumbo, la columna de agua de impacto y el hundimiento en V
+// Dibuja el buque en el horizonte circular de 360°, su indicador de rumbo, la columna de impacto y el hundimiento en V
 
 export const PERISCOPE_LENS_CENTER_X = 325;
 export const PERISCOPE_HORIZON_Y = 258;
@@ -139,8 +140,19 @@ export function renderTargetAndLeadMarker(
   const baseHalfWidth = (actualTargetEntry.lengthMeters * 0.9 * distanceScale) / 2;
   const realHalfWidth = baseHalfWidth * computeForeshorteningFactor(firingContext.targetAngleOnBowDeg);
   const bowSign = firingContext.targetBowSide === 'STARBOARD' ? 1 : -1;
-  const shipScreenX = PERISCOPE_LENS_CENTER_X + (snapshot.targetBearingDeg - snapshot.periscopeBearingDeg) * PIXELS_PER_BEARING_DEGREE;
+  const angularOffsetDeg = calculateSignedAngularDeltaDeg(snapshot.periscopeBearingDeg, snapshot.targetBearingDeg);
+  const shipScreenX = PERISCOPE_LENS_CENTER_X + angularOffsetDeg * PIXELS_PER_BEARING_DEGREE;
   const deckY = snapshot.targetDamageTaken > 0 ? PERISCOPE_HORIZON_Y - 8 : PERISCOPE_HORIZON_Y - 13;
+
+  // Si el buque queda fuera del cono visual de la lente, muestra un indicador lateral de localización acústica
+  if (Math.abs(angularOffsetDeg) > 24) {
+    context.fillStyle = '#ffd166';
+    context.font = 'bold 11px monospace';
+    context.textAlign = angularOffsetDeg > 0 ? 'right' : 'left';
+    const edgeX = angularOffsetDeg > 0 ? PERISCOPE_LENS_CENTER_X + 185 : PERISCOPE_LENS_CENTER_X - 185;
+    const label = angularOffsetDeg > 0 ? `BLANCO A ${snapshot.targetBearingDeg.toFixed(0)}° ►►` : `◄◄ BLANCO A ${snapshot.targetBearingDeg.toFixed(0)}°`;
+    context.fillText(label, edgeX, PERISCOPE_HORIZON_Y - 18);
+  }
 
   context.save();
   context.translate(shipScreenX, 0);
@@ -175,7 +187,6 @@ export function renderTargetAndLeadMarker(
   context.lineWidth = 2;
   context.stroke();
 
-  // Flecha indicadora de dirección de avance sobre la proa para saber hacia qué lado adelantar el tiro
   context.fillStyle = '#4cc9f0';
   context.font = 'bold 10px monospace';
   context.textAlign = 'center';
