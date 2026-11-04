@@ -17,7 +17,9 @@ import type {
 } from './TacticalTypes.ts';
 
 function clampTacticalPercentage(value: number): number {
-  return Math.max(0, Math.min(100, Math.round(value)));
+  const clamped = Math.max(0, Math.min(100, value));
+  const rounded = Math.round(clamped * 10) / 10;
+  return rounded === 0 ? 0 : rounded;
 }
 
 // Gobierna el tablero local 15x15, los alcances por cota (3/2/1 hex) en un único bucle plano y el avance del mercante

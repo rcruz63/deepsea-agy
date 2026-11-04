@@ -107,7 +107,7 @@ describe('HexTacticalEngine', () => {
 
     expect(resolution.status).toBe('END_ENCOUNTER');
     if (resolution.status === 'END_ENCOUNTER') {
-      expect(resolution.encounterResult.outcome).toBe('DISENGAGED');
+      expect(resolution.encounterResult.outcome).toBe('TARGET_ESCAPED');
       expect(resolution.encounterResult.isTargetSunk).toBe(false);
     }
   });

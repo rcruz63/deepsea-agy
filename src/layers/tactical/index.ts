@@ -34,6 +34,16 @@ export {
 } from './domain/TacticalFiringGeometry.ts';
 
 export {
+  MERCHANT_UPSTREAM_OFFSET_HEXES,
+  SUBMARINE_ADJACENT_DISTANCE_HEXES,
+  SUBMARINE_AMBUSH_DISTANCE_HEXES,
+  TACTICAL_BOARD_CENTER,
+  computeTacticalEncounterSpawn,
+  resolveHeadingTowardTarget,
+  type TacticalEncounterSpawnLayout,
+} from './domain/TacticalSpawnGeometry.ts';
+
+export {
   HexTacticalEngine,
   type HexTacticalEngineOptions,
 } from './domain/HexTacticalEngine.ts';

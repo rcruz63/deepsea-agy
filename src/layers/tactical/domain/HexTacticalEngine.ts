@@ -1,42 +1,36 @@
-import {
-  advanceArmoryReloadTurn,
-  startTorpedoReloadInArmory,
-} from '../../../core/armory/index.ts';
+import { advanceArmoryReloadTurn, startTorpedoReloadInArmory } from '../../../core/armory/index.ts';
 import type {
   DifficultyConfig,
   EncounterContext,
+  EncounterOutcomeReason,
   EncounterResult,
   ITacticalStage,
   TacticalStageResolution,
+  TimeOfDay,
+  WeatherState,
 } from '../../../core/contracts/index.ts';
-import {
-  type AxialCoordinate,
-  type HexGridMap,
-  areAxialCoordinatesEqual,
-} from '../../../core/hex/index.ts';
+import { type AxialCoordinate, type HexGridMap, areAxialCoordinatesEqual } from '../../../core/hex/index.ts';
 import {
   buildTacticalEncounterResult,
   buildTacticalFiringSolutionContext,
   evaluateTacticalFiringTelemetry,
 } from './TacticalFiringGeometry.ts';
 import {
-  INITIAL_TACTICAL_MERCHANT_COORDINATE,
-  INITIAL_TACTICAL_SUBMARINE_COORDINATE,
   advanceTacticalMerchantStep,
   applyTacticalSubmarineMovement,
   calculateTacticalReachableOptions,
   createTacticalHexGrid,
 } from './TacticalMovementRules.ts';
+import { createInitialTacticalSnapshots } from './TacticalSpawnGeometry.ts';
 import type {
   TacticalCommand,
-  TacticalDepth,
   TacticalHexCell,
   TacticalMerchantSnapshot,
   TacticalStateSnapshot,
   TacticalSubmarineSnapshot,
 } from './TacticalTypes.ts';
 
-// Implementa ITacticalStage sobre el tablero hexagonal 15x15 con turnos de 5 minutos y avance de 1 tick de recarga por turno
+// Implementa ITacticalStage sobre el tablero 15x15 con geometría relativa real de entrada, turnos de 5m y escape del blanco
 
 export interface HexTacticalEngineOptions {
   readonly initialSubmarineCoordinate?: AxialCoordinate;
@@ -51,6 +45,8 @@ export class HexTacticalEngine
   private readonly customMerchantCoordinate: AxialCoordinate | undefined;
   private turnNumber = 1;
   private difficulty: DifficultyConfig | null = null;
+  private timeOfDay: TimeOfDay = 'DAY';
+  private weather: WeatherState = 'CLEAR';
   private submarine: TacticalSubmarineSnapshot | null = null;
   private merchant: TacticalMerchantSnapshot | null = null;
   private resolution: TacticalStageResolution = { status: 'IN_PROGRESS' };
@@ -65,28 +61,18 @@ export class HexTacticalEngine
   }
 
   public startEncounter(context: EncounterContext): void {
-    const initialDepth: TacticalDepth =
-      context.submarine.stance === 'SURFACED' ? 'SURFACED' : 'PERISCOPE_DEPTH';
-
+    const initial = createInitialTacticalSnapshots(
+      this.grid,
+      context,
+      this.customSubCoordinate,
+      this.customMerchantCoordinate,
+    );
     this.turnNumber = 1;
     this.difficulty = context.difficulty;
-    this.submarine = {
-      coordinate: this.customSubCoordinate ?? INITIAL_TACTICAL_SUBMARINE_COORDINATE,
-      heading: 5,
-      depth: initialDepth,
-      fuel: context.submarine.fuel,
-      battery: context.submarine.battery,
-      hullIntegrity: context.submarine.hullIntegrity,
-      armory: context.submarine.armory,
-    };
-    // El corredor táctico local orienta siempre el tránsito mercante hacia el Este (0) para evitar emboscadas de popa pura (AOB 180°) desde (4,11)
-    this.merchant = {
-      contactId: context.targetShip.contactId,
-      spec: context.targetShip.spec,
-      coordinate: this.customMerchantCoordinate ?? INITIAL_TACTICAL_MERCHANT_COORDINATE,
-      heading: 0,
-      speedKnots: context.targetShip.speedKnots,
-    };
+    this.timeOfDay = context.timeOfDay ?? 'DAY';
+    this.weather = context.weather ?? 'CLEAR';
+    this.submarine = initial.submarine;
+    this.merchant = initial.merchant;
     this.resolution = { status: 'IN_PROGRESS' };
   }
 
@@ -113,7 +99,10 @@ export class HexTacticalEngine
     if (command.type === 'RAISE_PERISCOPE_AND_LOCK') {
       return this.handleRaisePeriscope();
     }
-    this.resolution = { status: 'END_ENCOUNTER', encounterResult: this.buildDisengagedResult() };
+    this.resolution = {
+      status: 'END_ENCOUNTER',
+      encounterResult: this.buildOutcomeResult('DISENGAGED'),
+    };
     return this.resolution;
   }
 
@@ -122,6 +111,8 @@ export class HexTacticalEngine
     return {
       turnNumber: this.turnNumber,
       difficulty,
+      timeOfDay: this.timeOfDay,
+      weather: this.weather,
       submarine,
       merchant,
       reachableOptions: calculateTacticalReachableOptions(this.grid, submarine, merchant.coordinate),
@@ -152,7 +143,10 @@ export class HexTacticalEngine
     this.turnNumber += 1;
 
     if (merchantStep.hasEscapedBoard) {
-      this.resolution = { status: 'END_ENCOUNTER', encounterResult: this.buildDisengagedResult() };
+      this.resolution = {
+        status: 'END_ENCOUNTER',
+        encounterResult: this.buildOutcomeResult('TARGET_ESCAPED'),
+      };
     }
     return this.resolution;
   }
@@ -169,20 +163,17 @@ export class HexTacticalEngine
         snapshot.merchant,
         snapshot.difficulty,
         snapshot.telemetry,
+        this.timeOfDay,
+        this.weather,
       ),
       tacticalTurnsElapsed: this.turnNumber - 1,
     };
     return this.resolution;
   }
 
-  private buildDisengagedResult(): EncounterResult {
+  private buildOutcomeResult(outcome: EncounterOutcomeReason): EncounterResult {
     const { submarine, merchant } = this.assertInitialized();
-    return buildTacticalEncounterResult(
-      submarine,
-      merchant,
-      'DISENGAGED',
-      this.turnNumber - 1,
-    );
+    return buildTacticalEncounterResult(submarine, merchant, outcome, this.turnNumber - 1);
   }
 
   private assertInitialized() {

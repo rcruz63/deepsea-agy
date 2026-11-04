@@ -2,7 +2,9 @@ import type {
   DifficultyConfig,
   SurfaceShipSpec,
   TargetBowSide,
+  TimeOfDay,
   TorpedoArmoryState,
+  WeatherState,
 } from '../../../core/contracts/index.ts';
 import type {
   AxialCoordinate,
@@ -56,6 +58,8 @@ export interface TacticalGeometryTelemetry {
 export interface TacticalStateSnapshot {
   readonly turnNumber: number;
   readonly difficulty: DifficultyConfig;
+  readonly timeOfDay: TimeOfDay;
+  readonly weather: WeatherState;
   readonly submarine: TacticalSubmarineSnapshot;
   readonly merchant: TacticalMerchantSnapshot;
   readonly reachableOptions: readonly TacticalReachableOption[];

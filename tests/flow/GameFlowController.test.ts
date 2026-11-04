@@ -93,11 +93,25 @@ describe('GameFlowController', () => {
       tacticalStage: tacticalEngine,
     });
 
-    // 1. Capa Estratégica -> Táctica
+    // 1. Capa Estratégica -> Táctica (intercepción adyacente a 1 hex -> aparece a 6 hex tácticos y debe cerrar distancia)
     const tacticalSnapshot = controller.beginTacticalEncounter();
     expect(tacticalSnapshot.phase).toBe('TACTICAL_ENCOUNTER');
 
-    // 2. Capa Táctica: pasar a profundidad PERISCOPE_DEPTH y subir periscopio (a 3 hexágonos = 1500m)
+    // 2. Capa Táctica: maniobrar en superficie 3 hex hacia el mercante para entrar en ventana de tiro (<= 4 hex) y bajar a periscopio
+    const viewBeforeClose = tacticalEngine.getViewState();
+    const bestCloseOption = viewBeforeClose.reachableOptions.reduce((best, opt) => {
+      const distOpt =
+        Math.abs(opt.coordinate.q - viewBeforeClose.merchant.coordinate.q) +
+        Math.abs(opt.coordinate.r - viewBeforeClose.merchant.coordinate.r);
+      const distBest =
+        Math.abs(best.coordinate.q - viewBeforeClose.merchant.coordinate.q) +
+        Math.abs(best.coordinate.r - viewBeforeClose.merchant.coordinate.r);
+      return distOpt < distBest ? opt : best;
+    });
+    tacticalEngine.executeCommand({
+      type: 'MOVE_SUBMARINE',
+      destination: bestCloseOption.coordinate,
+    });
     tacticalEngine.executeCommand({
       type: 'SET_DEPTH',
       depth: 'PERISCOPE_DEPTH',
@@ -113,15 +127,14 @@ describe('GameFlowController', () => {
       throw new Error('Se esperaba ARCADE_TORPEDO');
     }
 
-    // 3. Capa Arcade: configurar TDC con impacto magnético bajo quilla y hundir el blanco
+    // 3. Capa Arcade: configurar TDC con impacto magnético bajo quilla, apuntar al ángulo sugerido y hundir el blanco
     arcadeEngine.startAttack(arcadeSnapshot.activeFiringSolution);
     arcadeEngine.updateTdcInput({
       recognizedShipType: 'LIBERTY_CARGO',
       pistolType: 'MAGNETIC',
       torpedoDepthMeters: 8.5,
-      estimatedSpeedKnots: arcadeSnapshot.activeFiringSolution.targetSpeedKnots,
-      estimatedAobDeg: arcadeSnapshot.activeFiringSolution.targetAngleOnBowDeg,
     });
+    arcadeEngine.setPeriscopeBearing(arcadeEngine.getSnapshot().tdcSuggestedBearingDeg);
 
     const shot = arcadeEngine.fireSelectedTorpedo(0.99);
     expect(shot.outcome).toBe('HIT_KEEL_MAGNETIC');

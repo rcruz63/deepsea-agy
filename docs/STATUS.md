@@ -1,9 +1,13 @@
 # ESTADO DEL PROYECTO (HANDOFF & TRACKING)
 
 ## Estado Actual (Resumen Ejecutivo)
-**Fase 2 en ejecución — Hito 2.2 (Niebla de Guerra, Ciclo Luz/Clima, Hidrófono por Cono `±15°` y Radiogramas BdU Diferidos) completado y verificado** (`tsc --noEmit` limpio y 18 suites / 75 tests en verde, todos los archivos `< 200` líneas). Listo para implementar el **Hito 2.3 (Geometría Real de Entrada al `15x15` y Escape con Consecuencia)**.
+**Fase 2 en ejecución — Hito 2.3 (Geometría Real de Entrada al `15x15`, Persistencia Energética y Escape con Consecuencia) completado y verificado** (`tsc --noEmit` limpio y 19 suites / 78 tests en verde, todos los archivos `< 200` líneas). Listo para implementar el **Hito 2.4 (Viewport `100vw x 100vh` HiDPI, Lámina Histórica `N.º 1546` y Cámara *Pan & Zoom*)**.
 
 ## Completado Recientemente
+- **Hito 2.3 — Geometría Real de Entrada al `15x15`, Persistencia Energética y Escape con Consecuencia (`src/layers/tactical/`, `src/layers/strategic/domain/`):**
+  - Implementado `TacticalSpawnGeometry.ts` centrado en `(4, 7)`: el mercante entra `4 hex` aguas arriba en su rumbo estratégico real (`11` turnos garantizados en los `6` rumbos) y el U-Boot aparece a `4 hex` (`2000m`, emboscada en el mismo hex) o `6 hex` (`3000m`, intercepción adyacente) según `approachDirection`.
+  - Propagados `timeOfDay` y `weather` a `TacticalStateSnapshot` / `TacticalHudRenderer` / `FiringSolutionContext`, emitido `TARGET_ESCAPED` al salir por el borde del tablero y persistidos `updatedFuel` (`0.1%`) y `updatedBattery` hacia `CampaignState`.
+  - En `StrategicEncounterOutcomeApplier.ts`, todo blanco escapado o con ruptura de contacto avanza `+1 hex` en su derrota con `reinterceptCooldownTurns = 1`, eliminando la re-intercepción gratuita en la misma guardia.
 - **Hito 2.2 — Niebla de Guerra, Ciclo Luz/Clima, Hidrófono por Cono (`±15°`) y Radiogramas BdU (`src/layers/strategic/domain/`):**
   - Implementado `StrategicEnvironmentRules.ts` con reloj de guardia de `4h` (`NIGHT`, `DAWN`, `DAY`, `DUSK`), máquina meteorológica (`CLEAR`, `OVERCAST`, `STORM`) y radio visual óptico en superficie (`0..2 hex`, `0 hex` en tormenta o sumergido).
   - Implementado `StrategicHydrophoneRules.ts` con alcance `5 hex` parado y `3 hex` navegando (`-1 hex` en `STORM`), emitiendo conos de demora `±15°` e intensidad (`STRONG`, `MEDIUM`, `WEAK`) sin filtrar coordenadas axiales del blanco.
@@ -40,15 +44,13 @@
   - Nuevas suites de tests en `tests/layers/arcade-torpedo/` y prueba de ciclo completo de las 3 capas en `tests/flow/GameFlowController.test.ts` (**15 suites / 62 tests en verde**).
 
 ## En Progreso (Working On)
-- Iniciando **Hito 2.3 (Geometría Real de Entrada al `15x15`, Persistencia Energética y Escape con Consecuencia)**.
+- Iniciando **Hito 2.4 (Viewport `100vw x 100vh` HiDPI, Lámina Histórica `N.º 1546`, Cámara *Pan & Zoom* y HUD de Barra Superior + Cartelas)**.
 
 ## Próximos Pasos (Backlog Inmediato)
-1. **Hito 2.3 — Geometría Real de Entrada al `15x15` y Escape con Consecuencia:** `TacticalSpawnGeometry.ts` centrado en `(4, 7)` con rumbo real del mercante (`11` turnos), spawn relativo del submarino según `approachDirection`/`interceptionDistanceHexes`, persistencia `updatedFuel`/`updatedBattery` y avance `+1 hex` con `reinterceptCooldownTurns = 1` al escapar (`TARGET_ESCAPED`).
-2. **Hito 2.4 — Viewport `100vw x 100vh` HiDPI, Lámina Histórica de Fondo y Cámara *Pan & Zoom*:** Carta histórica calibrada a `45x27` (y atenuada tras Táctico/Arcade `960x640`), rejilla hexagonal sutil y HUD de Barra Superior + Cartelas Flotantes con salto de cámara a radiogramas.
-3. **Hito 2.5 — Retorno a Base Naval, *Kriegstagebuch* y Campaña Multi-Patrulla:** Atraque en Brest/Lorient/Saint-Nazaire, informe de patrulla, rearme/reparación con avance de calendario y zarpe a nueva patrulla.
+1. **Hito 2.4 — Viewport `100vw x 100vh` HiDPI, Lámina Histórica de Fondo y Cámara *Pan & Zoom*:** Carta histórica calibrada a `45x27` (y atenuada tras Táctico/Arcade `960x640`), rejilla hexagonal sutil y HUD de Barra Superior + Cartelas Flotantes con salto de cámara a radiogramas.
+2. **Hito 2.5 — Retorno a Base Naval, *Kriegstagebuch* y Campaña Multi-Patrulla:** Atraque en Brest/Lorient/Saint-Nazaire, informe de patrulla, rearme/reparación con avance de calendario y zarpe a nueva patrulla.
 
 ## Deuda Técnica y Decisiones Pendientes (Tech Debt)
-- Sin deuda técnica en la arquitectura actual (62 archivos `.ts` `< 200` líneas, cero bucles anidados, 62 tests en verde).
+- Sin deuda técnica en la arquitectura actual (todos los archivos `.ts` `< 200` líneas, cero bucles anidados, 78 tests en verde).
 - **Limitaciones conocidas planificadas por fase (NO parchear fuera de su hito):**
-  - `EncounterResult` aún no persiste `fuel`/`battery` tácticos ni distancia al contacto escapado -> se resuelve en **Hito 2.3**.
   - En `PeriscopeKinematics.ts`, `distanceMeters` permanece fija y `normalizePeriscopeBroadsideAob` acota el ángulo inicial a `75°..105°` -> programado para sustituirse por **cinemática 2D real `(x, y)`** en la **Fase 3**.

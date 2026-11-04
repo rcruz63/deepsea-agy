@@ -4,16 +4,33 @@ import type {
   StrategicContactState,
   TheaterDefinition,
 } from '../../../core/contracts/index.ts';
-import type { AxialCoordinate, HexGridMap } from '../../../core/hex/index.ts';
+import { type AxialCoordinate, type HexGridMap, areAxialCoordinatesEqual } from '../../../core/hex/index.ts';
 import {
   DEFAULT_ATLANTIC_WAYPOINTS,
   type StrategicMapCell,
 } from './AtlanticSectorScenario.ts';
 import { createCorridorMerchantContact } from './StrategicCorridorGenerator.ts';
-import { clampStrategicResource } from './StrategicResourceRules.ts';
+import { advanceSingleMerchantContact } from './StrategicMerchantController.ts';
+import { clampStrategicResource, isSubmarineStrandedAtSea } from './StrategicResourceRules.ts';
 import { refreshCampaignSensorSuite } from './StrategicSensorSuite.ts';
 
-// Aplica de forma pura el EncounterResult devuelto por las capas inferiores actualizando tonelaje, combustible, armería y sensores
+// Aplica el EncounterResult devuelto por las capas inferiores: persiste energía/armería y aleja +1 hex al contacto escapado
+
+function resolveUpdatedContactAfterEncounter(
+  contact: StrategicContactState,
+  result: EncounterResult,
+  route: readonly AxialCoordinate[] | undefined,
+): StrategicContactState {
+  if (contact.contactId !== result.contactId) {
+    return contact;
+  }
+  if (result.isTargetSunk || result.sunkShipIds.includes(contact.contactId)) {
+    return { ...contact, isSunk: true, reinterceptCooldownTurns: 0 };
+  }
+  // Si el mercante escapa o se rompe contacto, gana +1 hex de ventaja y 1 guardia de enfriamiento contra re-intercepción gratuita
+  const stepped = advanceSingleMerchantContact(contact, route);
+  return { ...stepped, reinterceptCooldownTurns: 1 };
+}
 
 export function applyEncounterOutcomeToCampaign(
   state: CampaignState,
@@ -25,13 +42,9 @@ export function applyEncounterOutcomeToCampaign(
   readonly nextState: CampaignState;
   readonly nextRoutes: Readonly<Record<string, readonly AxialCoordinate[]>>;
 } {
-  const nextHull = clampStrategicResource(
-    state.submarine.hullIntegrity - result.hullDamageTaken,
-  );
+  const nextHull = clampStrategicResource(state.submarine.hullIntegrity - result.hullDamageTaken);
   const updatedContacts: StrategicContactState[] = state.contacts.map((contact) =>
-    contact.contactId === result.contactId && result.isTargetSunk
-      ? { ...contact, isSunk: true }
-      : contact,
+    resolveUpdatedContactAfterEncounter(contact, result, routesByContactId[contact.contactId]),
   );
   let nextRoutes = routesByContactId;
 
@@ -40,10 +53,8 @@ export function applyEncounterOutcomeToCampaign(
     if ((theater.routeCorridors?.length ?? 0) > 0) {
       updatedContacts.push(createCorridorMerchantContact(grid, theater, ordinal, 0));
     } else {
-      const nextSpec =
-        theater.surfaceShipCatalog[ordinal % theater.surfaceShipCatalog.length]!;
-      const wp =
-        DEFAULT_ATLANTIC_WAYPOINTS[(ordinal * 3) % DEFAULT_ATLANTIC_WAYPOINTS.length]!;
+      const nextSpec = theater.surfaceShipCatalog[ordinal % theater.surfaceShipCatalog.length]!;
+      const wp = DEFAULT_ATLANTIC_WAYPOINTS[(ordinal * 3) % DEFAULT_ATLANTIC_WAYPOINTS.length]!;
       const newId = `merchant_${ordinal + 1}`;
       nextRoutes = { ...nextRoutes, [newId]: DEFAULT_ATLANTIC_WAYPOINTS };
       updatedContacts.push({
@@ -56,15 +67,20 @@ export function applyEncounterOutcomeToCampaign(
     }
   }
 
+  const nextSubmarine = {
+    ...state.submarine,
+    hullIntegrity: nextHull,
+    fuel: clampStrategicResource(result.updatedFuel),
+    battery: clampStrategicResource(result.updatedBattery),
+    armory: result.updatedArmory,
+  };
+  const isAtBase = theater.bases.some((b) => areAxialCoordinatesEqual(b.coordinate, nextSubmarine.coordinate));
+  const stranded = isSubmarineStrandedAtSea(nextSubmarine, isAtBase);
+
   const rawNextState: CampaignState = {
     ...state,
-    submarine: {
-      ...state.submarine,
-      hullIntegrity: nextHull,
-      fuel: clampStrategicResource(result.updatedFuel),
-      battery: clampStrategicResource(result.updatedBattery),
-      armory: result.updatedArmory,
-    },
+    patrolStatus: stranded ? 'ABORTED_AT_SEA' : state.patrolStatus,
+    submarine: nextSubmarine,
     contacts: updatedContacts,
     patrolTorpedoesFired: state.patrolTorpedoesFired + result.torpedoesFiredInEncounter,
     patrolTorpedoHits: state.patrolTorpedoHits + result.torpedoHitsInEncounter,

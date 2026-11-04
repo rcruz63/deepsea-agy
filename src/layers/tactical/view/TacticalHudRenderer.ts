@@ -97,10 +97,13 @@ export function renderTacticalHudPanel(
   context.fillStyle = '#00ffaa';
   context.font = 'bold 13px monospace';
   context.textAlign = 'left';
-  context.fillText(`TURNO TÁCTICO #${snapshot.turnNumber} (+${snapshot.turnNumber * 5} MIN)`, 680, 36);
+  context.fillText(`TURNO TÁCTICO #${snapshot.turnNumber} (+${snapshot.turnNumber * 5} MIN)`, 680, 32);
+  context.font = '10px monospace';
+  context.fillStyle = '#ffd166';
+  context.fillText(`ENTORNO: ${snapshot.timeOfDay} | MAR: ${snapshot.weather}`, 680, 47);
   context.font = '11px monospace';
   context.fillStyle = '#a8dadc';
-  context.fillText(`FUEL: ${submarine.fuel}% | BAT: ${submarine.battery}% | CASCO: ${submarine.hullIntegrity}%`, 680, 56);
+  context.fillText(`FUEL: ${submarine.fuel.toFixed(1)}% | BAT: ${submarine.battery}% | CASCO: ${submarine.hullIntegrity}%`, 680, 62);
 
   let depthY = 70;
   for (const spec of DEPTH_BUTTON_SPECS) {

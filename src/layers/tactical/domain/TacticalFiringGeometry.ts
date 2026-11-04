@@ -4,7 +4,9 @@ import type {
   EncounterResult,
   FiringSolutionContext,
   TargetBowSide,
+  TimeOfDay,
   TorpedoArmoryState,
+  WeatherState,
 } from '../../../core/contracts/index.ts';
 import {
   type AxialCoordinate,
@@ -105,11 +107,10 @@ export function buildTacticalFiringSolutionContext(
   merchant: TacticalMerchantSnapshot,
   difficulty: DifficultyConfig,
   telemetry: TacticalGeometryTelemetry,
+  timeOfDay: TimeOfDay = 'DAY',
+  weather: WeatherState = 'CLEAR',
 ): FiringSolutionContext {
-  const submarineBowNeighbor = getHexNeighbor(
-    submarine.coordinate,
-    submarine.heading,
-  );
+  const submarineBowNeighbor = getHexNeighbor(submarine.coordinate, submarine.heading);
   const submarineCourseDeg = calculateNavalBearingDegrees(
     submarine.coordinate,
     submarineBowNeighbor,
@@ -127,6 +128,8 @@ export function buildTacticalFiringSolutionContext(
     contactId: merchant.contactId,
     armory: submarine.armory,
     difficulty,
+    timeOfDay,
+    weather,
     targetShip: {
       contactId: merchant.contactId,
       spec: merchant.spec,

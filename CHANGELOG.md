@@ -8,6 +8,9 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
 ## [Unreleased]
 
 ### Added
+- **Hito 2.3 — Geometría Real de Entrada al `15x15`, Persistencia Energética y Escape con Consecuencia (`src/layers/tactical/`, `src/layers/strategic/domain/`):**
+  - Módulo `TacticalSpawnGeometry` que proyecta el rumbo real del mercante sobre el centro `(4, 7)` (`11` turnos garantizados en las `6` direcciones) y despliega al U-Boot a `4 hex` (`2000m`) o `6 hex` (`3000m`) según `interceptionDistanceHexes` y `approachDirection`.
+  - Indicador de entorno (`TimeOfDay` y `WeatherState`) en `TacticalHudRenderer`, desenlace `TARGET_ESCAPED` al escapar del tablero `15x15`, persistencia decimal `0.1%` de `fuel`/`battery` hacia `CampaignState` y avance `+1 hex` con `reinterceptCooldownTurns = 1` del contacto escapado.
 - **Hito 2.2 — Niebla de Guerra Estratégica, Reloj/Clima, Hidrófono por Cono y Radiogramas BdU (`src/layers/strategic/domain/`):**
   - Reloj de guardia de `4h` (`NIGHT`, `DAWN`, `DAY`, `DUSK`), máquina meteorológica (`CLEAR`, `OVERCAST`, `STORM`) y radio visual en superficie (`0..2 hex`) en `StrategicEnvironmentRules`.
   - Ronda hidrofónica sumergida en `StrategicHydrophoneRules` (`5 hex` parado / `3 hex` en marcha, `-1` en tormenta) con conos de incertidumbre `±15°` e intensidad `STRONG / MEDIUM / WEAK` sin revelar coordenadas exactas.
