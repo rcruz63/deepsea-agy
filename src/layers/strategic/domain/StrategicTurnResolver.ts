@@ -12,6 +12,7 @@ import {
   advanceBduPatrolOrderProgress,
   maybeGenerateBduSightingReport,
 } from './BduRadiogramController.ts';
+import { buildKriegstagebuchSummary } from './PatrolRefitRules.ts';
 import {
   advancePatrolClockFourHours,
   advanceWeatherState,
@@ -84,8 +85,15 @@ export function resolveSingleWatchStep(
     contacts: updatedContacts,
     activePatrolOrder: nextOrder,
   };
-  const newReport = maybeGenerateBduSightingReport(steppedState, grid, theater, randomRoll);
-  return refreshCampaignSensorSuite(steppedState, selectedOption.stepDistance, newReport);
+  const withSummary: CampaignState =
+    stranded && steppedState.lastPatrolSummary === null
+      ? {
+          ...steppedState,
+          lastPatrolSummary: buildKriegstagebuchSummary(steppedState, theater, 'ABORTED_AT_SEA'),
+        }
+      : steppedState;
+  const newReport = maybeGenerateBduSightingReport(withSummary, grid, theater, randomRoll);
+  return refreshCampaignSensorSuite(withSummary, selectedOption.stepDistance, newReport);
 }
 
 function shouldInterruptTwentyFourHourTransit(

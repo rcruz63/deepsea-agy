@@ -1,9 +1,13 @@
 # ESTADO DEL PROYECTO (HANDOFF & TRACKING)
 
 ## Estado Actual (Resumen Ejecutivo)
-**Fase 2 en ejecución — Hito 2.4 (Viewport `100% x 100dvh` HiDPI, Lámina Histórica `N.º 1546`, Cámara *Pan & Zoom* y HUD Flotante) completado y verificado** (`tsc --noEmit` limpio, `vite build` limpio y 20 suites / 80 tests en verde, todos los archivos `< 200` líneas). Listo para implementar el **Hito 2.5 (Retorno a Base Naval, *Kriegstagebuch* y Campaña Multi-Patrulla)**.
+**Fase 2 (Campaña Estratégica — Atlántico Norte `45x27` *Marinequadrat*) COMPLETADA al 100% — Hitos 2.0 a 2.5 cerrados y verificados** (`tsc --noEmit` limpio, `vite build` limpio y **21 suites / 82 tests en verde**, todos los archivos `.ts` `< 200` líneas, cero bucles anidados y aislamiento estricto entre las 3 capas). Proyecto listo para iniciar el diseño e implementación de la **Fase 3 (Convoyes Multi-Barco, Escoltas, IA Reactiva y Sonar/ASDIC)**.
 
 ## Completado Recientemente
+- **Hito 2.5 — Retorno a Base Naval, *Kriegstagebuch* y Campaña Multi-Patrulla (`src/layers/strategic/domain/PatrolRefitRules.ts`, `src/layers/strategic/view/KriegstagebuchModalRenderer.ts`):**
+  - Implementado el atraque en cualquiera de las bases propias de la costa francesa (`Brest`, `Lorient`, `Saint-Nazaire`) tras zarpar (`turnNumber > 1`), más cierre automático `ABORTED_AT_SEA` por agotamiento en alta mar con penalización de remolque (`+10` días).
+  - Generación de `KriegstagebuchPatrolSummary` y modal mecanografiado `KriegstagebuchModalRenderer` con días en la mar, cumplimiento de orden BdU, buques/BRT de patrulla y carrera, precisión de torpedos y días de dique seco (`14` base + reparación de casco + rearme).
+  - Reinicio multi-patrulla (`prepareNextCampaignPatrol`) que restaura combustible, baterías, casco y armería al `100%`, avanza `campaignDay`, asigna nueva orden de sector BdU y regenera tráfico mercante con deriva en la Patrulla `N + 1`.
 - **Hito 2.4 — Viewport `100% x 100dvh` HiDPI, Lámina Histórica `N.º 1546` y Cámara *Pan & Zoom* (`src/shell/`, `src/layers/strategic/view/`, `index.html`, `src/main.ts`):**
   - Creado `ViewportFrameComposer.ts` con `ResizeObserver` + `devicePixelRatio` para ocupar el `100% x 100dvh` en Estratégico y centrar/escalar las consolas `960x640` de Táctico y Periscopio sobre la lámina histórica atenuada.
   - Creados `HistoricalChartBackdropBuilder.ts` y `StrategicCameraController.ts` con estética de papel envejecido *Marinequadratkarte Nr. 1546*, cuadrícula hueca `AD..CG` + `1..9` y LOD `11..99` al ampliar zoom.
@@ -48,12 +52,15 @@
   - Nuevas suites de tests en `tests/layers/arcade-torpedo/` y prueba de ciclo completo de las 3 capas en `tests/flow/GameFlowController.test.ts` (**15 suites / 62 tests en verde**).
 
 ## En Progreso (Working On)
-- Iniciando **Hito 2.5 (Retorno a Base Naval, *Kriegstagebuch* y Campaña Multi-Patrulla)**.
+- Ninguna tarea en curso. **Fase 2 cerrada y estabilizada** en rama `main`.
 
 ## Próximos Pasos (Backlog Inmediato)
-1. **Hito 2.5 — Retorno a Base Naval, *Kriegstagebuch* y Campaña Multi-Patrulla:** `PatrolRefitRules.ts`, `KriegstagebuchModalRenderer.ts`, atraque en Brest/Lorient/Saint-Nazaire, rearme/reparación con avance de calendario (`14` días base + días por daños/torpedos) y zarpe a la Patrulla `N + 1`.
+1. **Fase 3 — Especificación Detallada (`docs/phases/PHASE_03_CONVOYS_AND_ASDIC.md`):** Cerrar las reglas matemáticas de convoyes multi-barco (`ships[]`), escoltas destructores/corbetas, niebla acústica en `DEEP`, detección visual en `SURFACED`/periscopio, mercantes reactivos/zigzag/`DEMS` y cinemática 2D real `(x, y)` del periscopio.
+2. **Hito 3.1 — Convoyes Multi-Barco y IA Reactiva en Táctico `15x15`:** Renderizado y movimiento de múltiples buques sobre `EncounterContext.ships[]`, viraje de evasión y detección en superficie.
+3. **Hito 3.2 — Escoltas, Ping Activo ASDIC y Niebla Acústica en `DEEP`:** Mecánica de búsqueda de destructores y degradación de contactos a marcaciones en cota profunda.
+4. **Hito 3.3 — Cinemática 2D Real `(x, y)` en el Periscopio Arcade:** Sustituir `distanceMeters` fija por avance real de blancos y escoltas para eliminar el tiempo infinito de apuntado.
 
 ## Deuda Técnica y Decisiones Pendientes (Tech Debt)
-- Sin deuda técnica en la arquitectura actual (todos los archivos `.ts` `< 200` líneas, cero bucles anidados, 80 tests en verde).
+- Sin deuda técnica en la arquitectura actual (todos los archivos `.ts` `< 200` líneas, máximo `197` líneas, cero bucles anidados, 82 tests en verde).
 - **Limitaciones conocidas planificadas por fase (NO parchear fuera de su hito):**
   - En `PeriscopeKinematics.ts`, `distanceMeters` permanece fija y `normalizePeriscopeBroadsideAob` acota el ángulo inicial a `75°..105°` -> programado para sustituirse por **cinemática 2D real `(x, y)`** en la **Fase 3**.

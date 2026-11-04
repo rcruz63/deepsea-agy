@@ -104,6 +104,17 @@ export {
   refreshCampaignSensorSuite,
 } from './domain/StrategicSensorSuite.ts';
 
+export {
+  BASE_REFIT_DAYS,
+  TOWED_RESCUE_PENALTY_DAYS,
+  buildKriegstagebuchSummary,
+  calculatePatrolRefitDays,
+  canDockAtNavalBase,
+  dockSubmarineAtNavalBase,
+  findNavalBaseAtCoordinate,
+  prepareNextCampaignPatrol,
+} from './domain/PatrolRefitRules.ts';
+
 export { StrategicEngine } from './domain/StrategicEngine.ts';
 export type { StrategicEngineOptions } from './domain/StrategicEngine.ts';
 

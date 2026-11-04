@@ -2,6 +2,7 @@ import type { EncounterContext } from '../../../core/contracts/index.ts';
 import type { AxialCoordinate, Point2D } from '../../../core/hex/index.ts';
 import type { StrategicEngine } from '../domain/StrategicEngine.ts';
 import { buildHistoricalChartBackdrop } from './HistoricalChartBackdropBuilder.ts';
+import { renderKriegstagebuchModal } from './KriegstagebuchModalRenderer.ts';
 import { StrategicCameraController } from './StrategicCameraController.ts';
 import {
   type HudBlockingRect,
@@ -156,10 +157,23 @@ export class StrategicStageView {
       context,
       state,
       interceptable !== undefined,
-      false,
+      this.engine.canDockAtBase(),
       viewportWidth,
       viewportHeight,
     );
+
+    if (state.lastPatrolSummary !== null) {
+      const modal = renderKriegstagebuchModal(
+        context,
+        state.lastPatrolSummary,
+        viewportWidth,
+        viewportHeight,
+      );
+      this.lastHudRegions = modal.interactiveRegions;
+      this.lastBlockingRects = modal.blockingRects;
+      return;
+    }
+
     this.lastHudRegions = [...topRegions, ...cartouches.interactiveRegions];
     this.lastBlockingRects = cartouches.blockingRects;
   }

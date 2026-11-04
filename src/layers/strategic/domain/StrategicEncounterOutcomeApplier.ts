@@ -9,6 +9,7 @@ import {
   DEFAULT_ATLANTIC_WAYPOINTS,
   type StrategicMapCell,
 } from './AtlanticSectorScenario.ts';
+import { buildKriegstagebuchSummary } from './PatrolRefitRules.ts';
 import { createCorridorMerchantContact } from './StrategicCorridorGenerator.ts';
 import { advanceSingleMerchantContact } from './StrategicMerchantController.ts';
 import { clampStrategicResource, isSubmarineStrandedAtSea } from './StrategicResourceRules.ts';
@@ -89,8 +90,16 @@ export function applyEncounterOutcomeToCampaign(
     totalSunkTonnage: state.totalSunkTonnage + result.sunkTonnageAwarded,
   };
 
+  const withSummary: CampaignState =
+    stranded && rawNextState.lastPatrolSummary === null
+      ? {
+          ...rawNextState,
+          lastPatrolSummary: buildKriegstagebuchSummary(rawNextState, theater, 'ABORTED_AT_SEA'),
+        }
+      : rawNextState;
+
   return {
     nextRoutes,
-    nextState: refreshCampaignSensorSuite(rawNextState, 0, null),
+    nextState: refreshCampaignSensorSuite(withSummary, 0, null),
   };
 }

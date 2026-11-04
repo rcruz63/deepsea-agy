@@ -144,8 +144,15 @@ export function dispatchStrategicInteraction(
       return;
     }
     case 'DOCK_AT_BASE':
-    case 'START_NEXT_PATROL':
+      if (engine.canDockAtBase()) {
+        engine.dockAtNavalBase();
+      }
       return;
+    case 'START_NEXT_PATROL': {
+      const restarted = engine.startNextPatrol();
+      onCenterCoordinate(restarted.submarine.coordinate, 0.92);
+      return;
+    }
     case 'MOVE_TO_HEX': {
       const opt = engine.getReachableOptionAt(interaction.coordinate);
       if (opt !== undefined) {

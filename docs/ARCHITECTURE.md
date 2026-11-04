@@ -45,7 +45,7 @@ flowchart TD
 
 ---
 
-## 3. Estructura de Directorios (Estado tras Cierre de Fase 1 — Hitos 1.1 a 1.4)
+## 3. Estructura de Directorios (Estado tras Cierre de Fase 2 — Hitos 2.0 a 2.5)
 
 ```text
 /
@@ -59,32 +59,33 @@ flowchart TD
 │   ├── STATUS.md                         # Estado vivo del proyecto para handoff inmediato
 │   └── phases/
 │       ├── PHASE_01_VERTICAL_SLICE.md    # Especificación funcional de la Fase 1 (cerrada)
-│       └── PHASE_02_STRATEGIC_CAMPAIGN.md # Especificación funcional y matemática de la Fase 2
+│       └── PHASE_02_STRATEGIC_CAMPAIGN.md # Especificación funcional y matemática de la Fase 2 (cerrada)
 ├── src/
-│   ├── core/                             # Lógica de dominio pura compartida (Hito 1.1 completado)
-│   │   ├── contracts/                    # Contratos inmutables e interfaces de transición
+│   ├── core/                             # Lógica de dominio pura compartida
+│   │   ├── contracts/                    # Contratos congelados (Environment, StrategicIntel, Encounter ships[])
 │   │   ├── difficulty/                   # Tabla de perfiles EASY, NORMAL, HARD
 │   │   ├── armory/                       # Máquina de estados de tubos y reserva de torpedos
-│   │   └── hex/                          # Geometría axial (q, r) e índice Map<string, HexCell>
+│   │   └── hex/                          # Geometría axial (q, r), HexGridMap y MarineQuadratMapper (AD..CG 11..99)
 │   ├── layers/
-│   │   ├── strategic/                    # Capa Estratégica 12x8 (Hito 1.2 completado)
-│   │   │   ├── domain/                   # Escenario Atlántico, abanico 0/1/2 hex, energía, intercepción y reemplazo de contactos
-│   │   │   └── view/                     # Carta náutica Canvas 2D, unidades, HUD e input handler
-│   │   ├── tactical/                     # Capa Táctica 15x15 tras ITacticalStage (Hito 1.3 completado)
-│   │   │   ├── domain/                   # Cotas, alcance 0..3 hex, geometría AOB/banda y HexTacticalEngine
-│   │   │   └── view/                     # Plotter 15x15, anillo de tiro 1..4 hex, HUD y periscopio
-│   │   └── arcade-torpedo/               # Capa Arcade Módulo A: Periscopio y TDC (Hito 1.4 completado)
+│   │   ├── strategic/                    # Capa Estratégica 45x27 Marinequadrat (Fase 2 completada)
+│   │   │   ├── domain/                   # Teatro Atlántico, escala 24H/4H, reloj/clima, hidrófono, BdU y PatrolRefitRules
+│   │   │   └── view/                     # Lámina Nr. 1546 cacheada, cámara pan/zoom, niebla, barra superior, cartelas y KTB
+│   │   ├── tactical/                     # Capa Táctica 15x15 tras ITacticalStage
+│   │   │   ├── domain/                   # TacticalSpawnGeometry (entrada real), cotas, AOB/banda y HexTacticalEngine
+│   │   │   └── view/                     # Plotter 15x15, anillo de tiro 1..4 hex, HUD con luz/clima y periscopio
+│   │   └── arcade-torpedo/               # Capa Arcade Módulo A: Periscopio 360° y TDC
 │   │       ├── domain/                   # ShipRecognitionManual, PeriscopeKinematics, TorpedoResolutionEngine y TorpedoArcadeEngine
 │   │       └── view/                     # PeriscopeTargetRenderer, PeriscopeLensRenderer, TdcControlPanelRenderer y TorpedoArcadeStageView
 │   ├── flow/                             # GameFlowController y GameFlowState (Ciclo 3 capas cerrado)
-│   └── main.ts                           # Arranque Canvas 2D conectado a las 3 capas vía GameFlowController
+│   ├── shell/                            # ViewportFrameComposer (100% x 100dvh HiDPI + consola 960x640 sobre carta atenuada)
+│   └── main.ts                           # Arranque Canvas 2D conectado a ViewportFrameComposer y GameFlowController
 └── tests/
-    ├── core/                             # Tests unitarios de dominio nuclear (hex y armory)
+    ├── core/                             # Tests unitarios de dominio nuclear (hex, armory y MarineQuadratMapper)
     ├── layers/
-    │   ├── strategic/                    # Tests unitarios de navegación, energía y motor estratégico
-    │   ├── tactical/                     # Tests unitarios de movimiento táctico, geometría AOB y motor 15x15
-    │   └── arcade-torpedo/               # Tests unitarios de trigonometría TDC, espoletas y secuencia multidisparo
-    └── flow/                             # Tests unitarios de integración del ciclo completo de las 3 capas
+    │   ├── strategic/                    # Tests de navegación, tránsito 24H, sensores/BdU, cámara y multi-patrulla
+    │   ├── tactical/                     # Tests de spawn relativo 15x15, movimiento, geometría AOB y escape
+    │   └── arcade-torpedo/               # Tests de trigonometría TDC, espoletas y secuencia multidisparo
+    └── flow/                             # Tests de integración del ciclo completo de las 3 capas
 ```
 
 ---

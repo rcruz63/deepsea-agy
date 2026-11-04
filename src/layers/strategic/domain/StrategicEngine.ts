@@ -15,6 +15,11 @@ import {
   createAtlanticHexGrid,
 } from './AtlanticSectorScenario.ts';
 import { NORTH_ATLANTIC_THEATER, createNorthAtlanticHexGrid } from './NorthAtlanticTheaterData.ts';
+import {
+  canDockAtNavalBase,
+  dockSubmarineAtNavalBase,
+  prepareNextCampaignPatrol,
+} from './PatrolRefitRules.ts';
 import { createInitialNorthAtlanticCampaignState } from './StrategicCorridorGenerator.ts';
 import { applyEncounterOutcomeToCampaign } from './StrategicEncounterOutcomeApplier.ts';
 import { buildStrategicEncounterContext, findInterceptableMerchant } from './StrategicMerchantController.ts';
@@ -169,6 +174,20 @@ export class StrategicEngine {
     );
     this.routesByContactId = applied.nextRoutes;
     this.state = applied.nextState;
+    return this.state;
+  }
+
+  public canDockAtBase(): boolean {
+    return canDockAtNavalBase(this.state, this.theater);
+  }
+
+  public dockAtNavalBase(): CampaignState {
+    this.state = dockSubmarineAtNavalBase(this.state, this.theater);
+    return this.state;
+  }
+
+  public startNextPatrol(): CampaignState {
+    this.state = prepareNextCampaignPatrol(this.state, this.grid, this.theater);
     return this.state;
   }
 }

@@ -8,6 +8,9 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
 ## [Unreleased]
 
 ### Added
+- **Hito 2.5 — Retorno a Base Naval, *Kriegstagebuch* y Campaña Multi-Patrulla (`src/layers/strategic/`):**
+  - Reglas `PatrolRefitRules` para atraque en `Brest`, `Lorient` o `Saint-Nazaire`, remolque automático `ABORTED_AT_SEA`, cálculo de días de carena/rearme (`14` base + casco + torpedos), restauración al `100%` y rotación de orden BdU y tráfico en la Patrulla `N + 1`.
+  - Renderizador modal `KriegstagebuchModalRenderer` con hoja mecanografiada del diario de guerra alemán (*KTB*) y botón de zarpe a la siguiente patrulla.
 - **Hito 2.4 — Viewport `100% x 100dvh` HiDPI, Lámina Histórica `N.º 1546` y Cámara *Pan & Zoom* (`src/shell/`, `src/layers/strategic/view/`, `index.html`, `src/main.ts`):**
   - `ViewportFrameComposer` con `ResizeObserver` + `devicePixelRatio` que adapta el lienzo a ventana completa en Estratégico y enmarca `960x640` sobre la carta histórica oscurecida en Táctico y Periscopio.
   - `HistoricalChartBackdropBuilder` (lámina envejecida *Marinequadratkarte Nr. 1546* alineada 1:1 con `45x27`, serif hueca `AD..CG` y LOD `11..99`), `StrategicCameraController` (*pan & zoom* centrado en cursor), `StrategicIntelOverlayRenderer`, `StrategicTopBarRenderer` y cartelas flotantes inferiores con salto de cámara a radiogramas BdU.
