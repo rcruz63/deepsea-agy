@@ -96,15 +96,27 @@ export function advanceAllStrategicContacts(
 export function findInterceptableMerchant(
   submarineCoordinate: AxialCoordinate,
   contacts: readonly StrategicContactState[],
+  visibleContactIds?: readonly string[],
+  isSubmerged = false,
 ): StrategicContactState | undefined {
-  return contacts.find(
-    (contact) =>
-      !contact.isSunk &&
-      !contact.hasReachedDestination &&
-      (contact.reinterceptCooldownTurns ?? 0) === 0 &&
-      calculateHexDistance(submarineCoordinate, contact.coordinate) <=
-        STRATEGIC_INTERCEPTION_RANGE_HEXES,
-  );
+  return contacts.find((contact) => {
+    if (
+      contact.isSunk ||
+      contact.hasReachedDestination ||
+      (contact.reinterceptCooldownTurns ?? 0) > 0
+    ) {
+      return false;
+    }
+    const distance = calculateHexDistance(submarineCoordinate, contact.coordinate);
+    if (distance > STRATEGIC_INTERCEPTION_RANGE_HEXES) {
+      return false;
+    }
+    // En la misma casilla (dist 0) o sumergido con hidrófono a corta distancia siempre se detecta; a 1 hex en superficie exige visibilidad
+    if (visibleContactIds === undefined || distance === 0 || isSubmerged) {
+      return true;
+    }
+    return visibleContactIds.includes(contact.contactId);
+  });
 }
 
 function resolveSurfaceShipSpec(

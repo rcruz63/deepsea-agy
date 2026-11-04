@@ -1,15 +1,21 @@
-import type {
-  CampaignState,
-  TheaterDefinition,
-} from '../../../core/contracts/index.ts';
+import type { CampaignState, TheaterDefinition } from '../../../core/contracts/index.ts';
 import {
   type AxialCoordinate,
   type HexGridMap,
   areAxialCoordinatesEqual,
+  calculateHexDistance,
   isCoordinateInsidePatrolSector,
   resolveAdjacentHexDirection,
 } from '../../../core/hex/index.ts';
 import type { StrategicMapCell } from './AtlanticSectorScenario.ts';
+import {
+  advanceBduPatrolOrderProgress,
+  maybeGenerateBduSightingReport,
+} from './BduRadiogramController.ts';
+import {
+  advancePatrolClockFourHours,
+  advanceWeatherState,
+} from './StrategicEnvironmentRules.ts';
 import {
   advanceAllStrategicContacts,
   findInterceptableMerchant,
@@ -23,18 +29,18 @@ import {
   completeStrategicTurnArmoryReload,
   isSubmarineStrandedAtSea,
 } from './StrategicResourceRules.ts';
+import { refreshCampaignSensorSuite } from './StrategicSensorSuite.ts';
 import {
   MAX_ECONOMICAL_TRANSIT_STEPS,
   WATCHES_PER_TWENTY_FOUR_HOURS,
 } from './StrategicTransitPathfinder.ts';
 
-// Orquesta el avance por guardia de 4h y la resolución paso a paso de TRÁNSITO 24H con interrupción automática (auto-drop)
+// Orquesta cada guardia de 4h (reloj, clima, sensores, BdU) y los 6 sub-ticks de TRÁNSITO 24H con auto-drop
 
-function isOnFriendlyNavalBase(
-  coordinate: AxialCoordinate,
-  theater: TheaterDefinition,
-): boolean {
-  return theater.bases.some((base) => areAxialCoordinatesEqual(base.coordinate, coordinate));
+const NEARBY_RADIOGRAM_INTERRUPT_HEXES = 6;
+
+function isOnFriendlyNavalBase(coord: AxialCoordinate, theater: TheaterDefinition): boolean {
+  return theater.bases.some((base) => areAxialCoordinatesEqual(base.coordinate, coord));
 }
 
 export function resolveSingleWatchStep(
@@ -43,17 +49,23 @@ export function resolveSingleWatchStep(
   grid: HexGridMap<StrategicMapCell>,
   theater: TheaterDefinition,
   routesByContactId: Readonly<Record<string, readonly AxialCoordinate[]>>,
+  randomRoll = 0.5,
 ): CampaignState {
-  const movedSubmarine = applyStrategicMovementEnergy(state.submarine, selectedOption);
-  const reloadedArmory = completeStrategicTurnArmoryReload(
-    movedSubmarine.armory,
-    state.difficulty,
-  );
-  const updatedSubmarine = { ...movedSubmarine, armory: reloadedArmory };
+  const movedSub = applyStrategicMovementEnergy(state.submarine, selectedOption);
+  const reloadedArmory = completeStrategicTurnArmoryReload(movedSub.armory, state.difficulty);
+  const updatedSubmarine = { ...movedSub, armory: reloadedArmory };
+  const nextTurnNumber = state.turnNumber + 1;
+  const nextClock = advancePatrolClockFourHours(state.clock);
+  const nextWeather = advanceWeatherState(state.weather, state.weatherTurnsRemaining, randomRoll);
   const updatedContacts = advanceAllStrategicContacts(
     state.contacts,
     routesByContactId,
     grid,
+    theater,
+  );
+  const nextOrder = advanceBduPatrolOrderProgress(
+    state.activePatrolOrder,
+    updatedSubmarine.coordinate,
     theater,
   );
   const stranded = isSubmarineStrandedAtSea(
@@ -61,23 +73,45 @@ export function resolveSingleWatchStep(
     isOnFriendlyNavalBase(updatedSubmarine.coordinate, theater),
   );
 
-  return {
+  const steppedState: CampaignState = {
     ...state,
-    turnNumber: state.turnNumber + 1,
+    turnNumber: nextTurnNumber,
+    clock: nextClock,
+    weather: nextWeather.weather,
+    weatherTurnsRemaining: nextWeather.weatherTurnsRemaining,
     patrolStatus: stranded ? 'ABORTED_AT_SEA' : state.patrolStatus,
     submarine: updatedSubmarine,
     contacts: updatedContacts,
+    activePatrolOrder: nextOrder,
   };
+  const newReport = maybeGenerateBduSightingReport(steppedState, grid, theater, randomRoll);
+  return refreshCampaignSensorSuite(steppedState, selectedOption.stepDistance, newReport);
 }
 
 function shouldInterruptTwentyFourHourTransit(
   state: CampaignState,
   theater: TheaterDefinition,
 ): boolean {
-  if (state.patrolStatus !== 'ACTIVE') {
+  if (state.patrolStatus !== 'ACTIVE' || state.visibleContactIds.length > 0) {
     return true;
   }
-  if (findInterceptableMerchant(state.submarine.coordinate, state.contacts) !== undefined) {
+  if (
+    findInterceptableMerchant(
+      state.submarine.coordinate,
+      state.contacts,
+      state.visibleContactIds,
+      false,
+    ) !== undefined
+  ) {
+    return true;
+  }
+  const hasNearbyFreshRadiogram = state.deliveredRadiograms.some(
+    (r) =>
+      r.createdAtTurn === state.turnNumber &&
+      calculateHexDistance(state.submarine.coordinate, r.centerCoordinate) <=
+        NEARBY_RADIOGRAM_INTERRUPT_HEXES,
+  );
+  if (hasNearbyFreshRadiogram) {
     return true;
   }
   const order = state.activePatrolOrder;
@@ -99,13 +133,12 @@ export function resolveTwentyFourHourTransitMove(
   grid: HexGridMap<StrategicMapCell>,
   theater: TheaterDefinition,
   routesByContactId: Readonly<Record<string, readonly AxialCoordinate[]>>,
+  randomProvider: () => number = () => 0.5,
 ): CampaignState {
   const steps = selectedOption.pathSteps ?? [];
   const isForced = steps.length > MAX_ECONOMICAL_TRANSIT_STEPS;
   const totalTicks = Math.max(WATCHES_PER_TWENTY_FOUR_HOURS, steps.length);
-  const perStepFuel = isForced
-    ? -FORCED_TRANSIT_FUEL_PER_HEX
-    : -ECONOMICAL_SURFACED_FUEL_PER_HEX;
+  const perStepFuel = isForced ? -FORCED_TRANSIT_FUEL_PER_HEX : -ECONOMICAL_SURFACED_FUEL_PER_HEX;
 
   let currentState = initialState;
   for (let tickIndex = 0; tickIndex < totalTicks; tickIndex += 1) {
@@ -131,11 +164,11 @@ export function resolveTwentyFourHourTransitMove(
       grid,
       theater,
       routesByContactId,
+      randomProvider(),
     );
     if (shouldInterruptTwentyFourHourTransit(currentState, theater)) {
       return { ...currentState, timeScale: 'PATROL_4H' };
     }
   }
-
   return currentState;
 }

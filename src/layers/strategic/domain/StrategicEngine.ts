@@ -14,33 +14,23 @@ import {
   type StrategicMapCell,
   createAtlanticHexGrid,
 } from './AtlanticSectorScenario.ts';
-import {
-  NORTH_ATLANTIC_THEATER,
-  createNorthAtlanticHexGrid,
-} from './NorthAtlanticTheaterData.ts';
+import { NORTH_ATLANTIC_THEATER, createNorthAtlanticHexGrid } from './NorthAtlanticTheaterData.ts';
 import { createInitialNorthAtlanticCampaignState } from './StrategicCorridorGenerator.ts';
-import {
-  buildStrategicEncounterContext,
-  findInterceptableMerchant,
-} from './StrategicMerchantController.ts';
-import { type ReachableHexOption, calculateReachableStrategicHexes } from './StrategicMovementNavigator.ts';
-import {
-  canSubmergeSubmarine,
-  switchStrategicSubmarineStance,
-} from './StrategicResourceRules.ts';
 import { applyEncounterOutcomeToCampaign } from './StrategicEncounterOutcomeApplier.ts';
-import {
-  resolveSingleWatchStep,
-  resolveTwentyFourHourTransitMove,
-} from './StrategicTurnResolver.ts';
+import { buildStrategicEncounterContext, findInterceptableMerchant } from './StrategicMerchantController.ts';
+import { type ReachableHexOption, calculateReachableStrategicHexes } from './StrategicMovementNavigator.ts';
+import { canSubmergeSubmarine } from './StrategicResourceRules.ts';
+import { applyCampaignStanceChange, refreshCampaignSensorSuite } from './StrategicSensorSuite.ts';
+import { resolveSingleWatchStep, resolveTwentyFourHourTransitMove } from './StrategicTurnResolver.ts';
 
-// Fachada de dominio puro de la capa estratégica; coordina escala 24H/4H, navegación, consumo, armería y contactos
+// Fachada de dominio puro de la capa estratégica; coordina escala 24H/4H, sensores, BdU, consumo, armería y contactos
 
 export interface StrategicEngineOptions {
   readonly initialState?: CampaignState;
   readonly grid?: HexGridMap<StrategicMapCell>;
   readonly theater?: TheaterDefinition;
   readonly routesByContactId?: Readonly<Record<string, readonly AxialCoordinate[]>>;
+  readonly randomProvider?: () => number;
 }
 
 export class StrategicEngine {
@@ -48,6 +38,7 @@ export class StrategicEngine {
   private readonly grid: HexGridMap<StrategicMapCell>;
   private readonly theater: TheaterDefinition;
   private routesByContactId: Readonly<Record<string, readonly AxialCoordinate[]>>;
+  private readonly randomProvider: () => number;
 
   public constructor(options: StrategicEngineOptions = {}) {
     const isLegacySector =
@@ -59,9 +50,11 @@ export class StrategicEngine {
       (this.theater.theaterId === ATLANTIC_SECTOR_THEATER.theaterId
         ? createAtlanticHexGrid()
         : createNorthAtlanticHexGrid());
-    this.state =
+    const baseState =
       options.initialState ?? createInitialNorthAtlanticCampaignState(undefined, this.grid);
+    this.state = refreshCampaignSensorSuite(baseState, 0, null);
     this.routesByContactId = options.routesByContactId ?? ATLANTIC_MERCHANT_ROUTES;
+    this.randomProvider = options.randomProvider ?? (() => Math.random());
   }
 
   public getState(): CampaignState {
@@ -103,10 +96,7 @@ export class StrategicEngine {
   }
 
   public setStance(targetStance: NavigationStance): CampaignState {
-    const nextSubmarine = switchStrategicSubmarineStance(this.state.submarine, targetStance);
-    const nextScale: StrategicTimeScale =
-      targetStance === 'SUBMERGED' ? 'PATROL_4H' : this.state.timeScale;
-    this.state = { ...this.state, timeScale: nextScale, submarine: nextSubmarine };
+    this.state = applyCampaignStanceChange(this.state, targetStance);
     return this.state;
   }
 
@@ -129,11 +119,8 @@ export class StrategicEngine {
   public executeTurnMove(destination: AxialCoordinate): CampaignState {
     const selectedOption = this.getReachableOptionAt(destination);
     if (selectedOption === undefined) {
-      throw new Error(
-        `El hexágono (${destination.q}, ${destination.r}) no es alcanzable con la postura y recursos actuales.`,
-      );
+      throw new Error(`El hexágono (${destination.q}, ${destination.r}) no es alcanzable.`);
     }
-
     this.state =
       this.state.timeScale === 'TRANSIT_24H'
         ? resolveTwentyFourHourTransitMove(
@@ -142,6 +129,7 @@ export class StrategicEngine {
             this.grid,
             this.theater,
             this.routesByContactId,
+            this.randomProvider,
           )
         : resolveSingleWatchStep(
             this.state,
@@ -149,12 +137,19 @@ export class StrategicEngine {
             this.grid,
             this.theater,
             this.routesByContactId,
+            this.randomProvider(),
           );
     return this.state;
   }
 
   public getInterceptableContact() {
-    return findInterceptableMerchant(this.state.submarine.coordinate, this.state.contacts);
+    const isLegacy = this.theater.theaterId === ATLANTIC_SECTOR_THEATER.theaterId;
+    return findInterceptableMerchant(
+      this.state.submarine.coordinate,
+      this.state.contacts,
+      isLegacy ? undefined : this.state.visibleContactIds,
+      this.state.submarine.stance === 'SUBMERGED',
+    );
   }
 
   public createEncounterContext(): EncounterContext | null {

@@ -72,6 +72,38 @@ export {
   findInterceptableMerchant,
 } from './domain/StrategicMerchantController.ts';
 
+export {
+  BDU_HUNTING_SECTORS_POOL,
+  RADIOGRAM_EMISSION_INTERVAL_TURNS,
+  RADIOGRAM_EXPIRATION_WATCH_TURNS,
+  advanceBduPatrolOrderProgress,
+  createNextBduPatrolOrder,
+  maybeGenerateBduSightingReport,
+  routeAndExpireBduRadiograms,
+} from './domain/BduRadiogramController.ts';
+
+export {
+  advancePatrolClockFourHours,
+  advanceWeatherState,
+  evaluateVisibleContactIds,
+  resolveStrategicVisualRangeHexes,
+  resolveTimeOfDayForWatchHour,
+} from './domain/StrategicEnvironmentRules.ts';
+
+export {
+  HYDROPHONE_UNCERTAINTY_ARC_DEGREES,
+  MOVING_HYDROPHONE_RANGE_HEXES,
+  STATIONARY_HYDROPHONE_RANGE_HEXES,
+  evaluateHydrophoneContacts,
+  resolveHydrophoneMaxRangeHexes,
+  resolveHydrophoneSignalStrength,
+} from './domain/StrategicHydrophoneRules.ts';
+
+export {
+  applyCampaignStanceChange,
+  refreshCampaignSensorSuite,
+} from './domain/StrategicSensorSuite.ts';
+
 export { StrategicEngine } from './domain/StrategicEngine.ts';
 export type { StrategicEngineOptions } from './domain/StrategicEngine.ts';
 

@@ -8,6 +8,10 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
 ## [Unreleased]
 
 ### Added
+- **Hito 2.2 — Niebla de Guerra Estratégica, Reloj/Clima, Hidrófono por Cono y Radiogramas BdU (`src/layers/strategic/domain/`):**
+  - Reloj de guardia de `4h` (`NIGHT`, `DAWN`, `DAY`, `DUSK`), máquina meteorológica (`CLEAR`, `OVERCAST`, `STORM`) y radio visual en superficie (`0..2 hex`) en `StrategicEnvironmentRules`.
+  - Ronda hidrofónica sumergida en `StrategicHydrophoneRules` (`5 hex` parado / `3 hex` en marcha, `-1` en tormenta) con conos de incertidumbre `±15°` e intensidad `STRONG / MEDIUM / WEAK` sin revelar coordenadas exactas.
+  - Controlador `BduRadiogramController` y `StrategicSensorSuite` con órdenes de sector `3x3` (`6` guardias) y radiogramas con radio de error `1..3 hex` retenidos en `queuedSubmergedRadiograms` mientras el U-Boot permanece sumergido.
 - **Hito 2.1 — `MarineQuadratMapper`, Teatro Atlántico `45x27`, Deriva Comercial y Escala `24H / 4H` (`src/core/hex/`, `src/layers/strategic/domain/`):**
   - Traductor `O(1)` `MarineQuadratMapper` (`AD..CG`, subsectores `1..9` y subcuadrantes `11..99`) y escenario `NorthAtlanticTheaterData` (`45x27` celdas, Brest/Lorient/Saint-Nazaire, puertos aliados cerrados en Halifax/Liverpool/Gibraltar y corredores `HX`/`ON`/`HG` con deriva `±1 hex`).
   - Buscador de rutas `StrategicTransitPathfinder` (`1..8 hex`), resolutor `StrategicTurnResolver` con `6` ticks internos de `4h` e interrupción automática *auto-drop*, consumo diésel decimal (`0.1%`) y cierre `ABORTED_AT_SEA`.

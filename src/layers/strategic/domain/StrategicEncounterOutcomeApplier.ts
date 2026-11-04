@@ -11,8 +11,9 @@ import {
 } from './AtlanticSectorScenario.ts';
 import { createCorridorMerchantContact } from './StrategicCorridorGenerator.ts';
 import { clampStrategicResource } from './StrategicResourceRules.ts';
+import { refreshCampaignSensorSuite } from './StrategicSensorSuite.ts';
 
-// Aplica de forma pura el EncounterResult devuelto por las capas inferiores actualizando tonelaje, combustible, armería y tráfico
+// Aplica de forma pura el EncounterResult devuelto por las capas inferiores actualizando tonelaje, combustible, armería y sensores
 
 export function applyEncounterOutcomeToCampaign(
   state: CampaignState,
@@ -55,23 +56,25 @@ export function applyEncounterOutcomeToCampaign(
     }
   }
 
+  const rawNextState: CampaignState = {
+    ...state,
+    submarine: {
+      ...state.submarine,
+      hullIntegrity: nextHull,
+      fuel: clampStrategicResource(result.updatedFuel),
+      battery: clampStrategicResource(result.updatedBattery),
+      armory: result.updatedArmory,
+    },
+    contacts: updatedContacts,
+    patrolTorpedoesFired: state.patrolTorpedoesFired + result.torpedoesFiredInEncounter,
+    patrolTorpedoHits: state.patrolTorpedoHits + result.torpedoHitsInEncounter,
+    patrolSunkShipsCount: state.patrolSunkShipsCount + (result.isTargetSunk ? 1 : 0),
+    patrolSunkTonnage: state.patrolSunkTonnage + result.sunkTonnageAwarded,
+    totalSunkTonnage: state.totalSunkTonnage + result.sunkTonnageAwarded,
+  };
+
   return {
     nextRoutes,
-    nextState: {
-      ...state,
-      submarine: {
-        ...state.submarine,
-        hullIntegrity: nextHull,
-        fuel: clampStrategicResource(result.updatedFuel),
-        battery: clampStrategicResource(result.updatedBattery),
-        armory: result.updatedArmory,
-      },
-      contacts: updatedContacts,
-      patrolTorpedoesFired: state.patrolTorpedoesFired + result.torpedoesFiredInEncounter,
-      patrolTorpedoHits: state.patrolTorpedoHits + result.torpedoHitsInEncounter,
-      patrolSunkShipsCount: state.patrolSunkShipsCount + (result.isTargetSunk ? 1 : 0),
-      patrolSunkTonnage: state.patrolSunkTonnage + result.sunkTonnageAwarded,
-      totalSunkTonnage: state.totalSunkTonnage + result.sunkTonnageAwarded,
-    },
+    nextState: refreshCampaignSensorSuite(rawNextState, 0, null),
   };
 }
