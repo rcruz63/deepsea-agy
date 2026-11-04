@@ -37,7 +37,7 @@ describe('StrategicEngine', () => {
 
     expect(nextState.turnNumber).toBe(2);
     expect(nextState.submarine.coordinate).toEqual({ q: 9, r: 1 });
-    expect(nextState.submarine.fuel).toBe(98);
+    expect(nextState.submarine.fuel).toBe(99.1);
     expect(nextState.submarine.battery).toBe(90);
     expect(findTorpedoTubeById(nextState.submarine.armory, 'BOW-1')?.status).toBe(
       'LOADED',
@@ -64,7 +64,9 @@ describe('StrategicEngine', () => {
   });
 
   it('updates sunk tonnage, armory, and merchant status when applying EncounterResult', () => {
-    const engine = new StrategicEngine();
+    const engine = new StrategicEngine({
+      initialState: createInitialAtlanticCampaignState(),
+    });
     const initialArmory = engine.getState().submarine.armory;
     const armoryAfterShot = fireTorpedoTubeInArmory(initialArmory, 'BOW-1');
 

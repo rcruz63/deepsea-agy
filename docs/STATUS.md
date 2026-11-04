@@ -1,9 +1,13 @@
 # ESTADO DEL PROYECTO (HANDOFF & TRACKING)
 
 ## Estado Actual (Resumen Ejecutivo)
-**Fase 2 en ejecución — Hito 2.0 (Congelación de Contratos en `src/core/contracts/`) completado y verificado** (`tsc --noEmit` limpio y 15 suites / 62 tests en verde, todos los archivos `< 200` líneas). Todas las interfaces de transición e inteligencia de la Fase 2 están congeladas y listas para implementar el **Hito 2.1**.
+**Fase 2 en ejecución — Hito 2.1 (`MarineQuadratMapper`, Teatro Atlántico `45x27`, Corredores Aliados `±1 hex` y Escala `24H / 4H`) completado y verificado** (`tsc --noEmit` limpio y 17 suites / 70 tests en verde, todos los archivos `< 200` líneas). Listo para implementar el **Hito 2.2 (Niebla de Guerra, Ciclo Luz/Clima, Hidrófono por Cono y Radiogramas BdU)**.
 
 ## Completado Recientemente
+- **Hito 2.1 — `MarineQuadratMapper`, Teatro Atlántico `45x27`, Rutas con Deriva y Escala `24H / 4H` (`src/core/hex/`, `src/layers/strategic/domain/`):**
+  - Implementado `MarineQuadratMapper.ts` con traducción `O(1)` entre coordenadas axiales y `AD..CG` + subsectores `1..9` / `11..99` (`11,12,13 | 21,22,23 | 31,32,33`).
+  - Creado el Teatro del Atlántico Norte `45x27` (`NorthAtlanticTheaterData.ts`, `StrategicCorridorGenerator.ts`) con bases en Brest, Lorient y Saint-Nazaire, puertos aliados bloqueados en Halifax, Liverpool y Gibraltar, y 3 corredores transatlánticos (`HX`, `ON`, `HG`) con variación lateral `±1 hex`.
+  - Implementados `StrategicTransitPathfinder.ts`, `StrategicTurnResolver.ts` y recalibración decimal `0.1%` en `StrategicResourceRules.ts` (`-0.4%`, `-0.9%`, `-2.8%`), soportando tránsito oceánico de hasta `8 hex` con interrupción *auto-drop* a `PATROL_4H` y regla `ABORTED_AT_SEA`.
 - **Hito 2.0 — Congelación de Contratos de Fase 2 (`src/core/contracts/`):**
   - Creados `EnvironmentContracts.ts` (`StrategicTimeScale`, `PatrolClockState`, `TimeOfDay`, `WeatherState`) y `StrategicIntelContracts.ts` (`HydrophoneBearingContact`, `BduPatrolOrder`, `BduRadiogramReport`, `KriegstagebuchPatrolSummary`, `PatrolStatus`).
   - Ampliados `TheaterDefinition.ts` (`ALLIED_PORT`, `AlliedPortDefinition`, `CommercialRouteCorridor`, `MarineQuadratGridSpec`, `chartAssetUrl`), `CampaignState.ts` (niebla de guerra, cola de radiogramas en inmersión, reloj/clima y métricas de patrulla) y `EncounterContracts.ts` (`ships[]`, geometría de intercepción, `fuelAtPeriscope`/`batteryAtPeriscope`, `updatedFuel`/`updatedBattery`, `sunkShipIds`, `TARGET_ESCAPED` y telemetría de torpedos).
@@ -32,11 +36,10 @@
   - Nuevas suites de tests en `tests/layers/arcade-torpedo/` y prueba de ciclo completo de las 3 capas en `tests/flow/GameFlowController.test.ts` (**15 suites / 62 tests en verde**).
 
 ## En Progreso (Working On)
-- Iniciando **Hito 2.1 (`MarineQuadratMapper`, Teatro Atlántico `45x27`, Corredores Aliados `±1 hex` y Escala `24H / 4H`)**.
+- Iniciando **Hito 2.2 (Niebla de Guerra, Ciclo Luz/Clima, Hidrófono por Cono `±15°` y Radiogramas BdU Diferidos)**.
 
 ## Próximos Pasos (Backlog Inmediato)
-1. **Hito 2.1 — `MarineQuadratMapper`, Teatro Atlántico `45x27`, Corredores Aliados (`±1 hex`) y Escala `24H / 4H`:** Traductor `O(1)` de cuadrantes `AD..CG` (`11..99`), escenario `45x27` con bases del Eje y puertos aliados cerrados, escala `24H` (`6` sub-ticks de `4h` + *auto-drop*), consumo decimal (`0.1%`) y `ABORTED_AT_SEA`.
-2. **Hito 2.2 — Niebla de Guerra, Ciclo Luz/Clima, Hidrófono por Cono (`±15°`) y Radiogramas BdU Diferidos:** Ocultación de contactos fuera de radio visual (`0..2 hex`), escucha sumergida `3..5 hex` por demora/intensidad y cola de radiogramas entregada al emerger.
+1. **Hito 2.2 — Niebla de Guerra, Ciclo Luz/Clima, Hidrófono por Cono (`±15°`) y Radiogramas BdU Diferidos:** Ocultación de contactos fuera de radio visual (`0..2 hex`), escucha sumergida `3..5 hex` por demora/intensidad y cola de radiogramas entregada al emerger.
 3. **Hito 2.3 — Contratos `ships[]`, Geometría Real de Entrada al `15x15` y Escape con Consecuencia:** Actualizar `EncounterContext`/`EncounterResult` (`updatedFuel`, `updatedBattery`, `timeOfDay`, `weather`, `TARGET_ESCAPED`), spawn relativo según ángulo de intercepción y avance `+1 hex` del contacto escapado.
 4. **Hito 2.4 — Viewport `100vw x 100vh` HiDPI, Lámina Histórica de Fondo y Cámara *Pan & Zoom*:** Carta histórica calibrada a `45x27` (y atenuada tras Táctico/Arcade `960x640`), rejilla hexagonal sutil y HUD de Barra Superior + Cartelas Flotantes con salto de cámara a radiogramas.
 5. **Hito 2.5 — Retorno a Base Naval, *Kriegstagebuch* y Campaña Multi-Patrulla:** Atraque en Brest/Lorient/Saint-Nazaire, informe de patrulla, rearme/reparación con avance de calendario y zarpe a nueva patrulla.

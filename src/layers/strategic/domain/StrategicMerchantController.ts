@@ -7,12 +7,15 @@ import type {
 } from '../../../core/contracts/index.ts';
 import {
   type AxialCoordinate,
+  type HexGridMap,
   areAxialCoordinatesEqual,
   calculateHexDistance,
 } from '../../../core/hex/index.ts';
+import type { StrategicMapCell } from './AtlanticSectorScenario.ts';
+import { createCorridorMerchantContact } from './StrategicCorridorGenerator.ts';
 import { resolveAdjacentHexDirection } from './StrategicMovementNavigator.ts';
 
-// Gestiona el avance de convoyes/mercantes por sus rutas de tránsito y evalúa la condición de intercepción (distancia axial <= 1)
+// Gestiona el avance de convoyes por corredores transatlánticos y evalúa la condición de intercepción (distancia <= 1 sin enfriamiento)
 
 export const STRATEGIC_INTERCEPTION_RANGE_HEXES = 1;
 
@@ -23,38 +26,71 @@ function findWaypointIndex(
   return route.findIndex((waypoint) => areAxialCoordinatesEqual(waypoint, coordinate));
 }
 
+function advanceAlongCorridorWaypoints(
+  contact: StrategicContactState,
+): StrategicContactState {
+  const waypoints = contact.routeWaypoints!;
+  const nextCooldown = Math.max(0, (contact.reinterceptCooldownTurns ?? 0) - 1);
+  if (contact.isSunk || contact.hasReachedDestination || waypoints.length === 0) {
+    return { ...contact, reinterceptCooldownTurns: nextCooldown };
+  }
+
+  const nextIndex = (contact.waypointIndex ?? 0) + 1;
+  if (nextIndex >= waypoints.length) {
+    return { ...contact, hasReachedDestination: true, reinterceptCooldownTurns: 0 };
+  }
+
+  const nextCoordinate = waypoints[nextIndex]!;
+  return {
+    ...contact,
+    coordinate: nextCoordinate,
+    heading: resolveAdjacentHexDirection(contact.coordinate, nextCoordinate, contact.heading),
+    waypointIndex: nextIndex,
+    reinterceptCooldownTurns: nextCooldown,
+  };
+}
+
 export function advanceSingleMerchantContact(
   contact: StrategicContactState,
   route: readonly AxialCoordinate[] | undefined,
 ): StrategicContactState {
+  if (contact.routeWaypoints !== undefined) {
+    return advanceAlongCorridorWaypoints(contact);
+  }
+  const nextCooldown = Math.max(0, (contact.reinterceptCooldownTurns ?? 0) - 1);
   if (contact.isSunk || route === undefined || route.length === 0) {
-    return contact;
+    return { ...contact, reinterceptCooldownTurns: nextCooldown };
   }
 
   const currentWaypointIndex = findWaypointIndex(route, contact.coordinate);
   const nextWaypointIndex =
     currentWaypointIndex === -1 ? 0 : (currentWaypointIndex + 1) % route.length;
   const nextCoordinate = route[nextWaypointIndex]!;
-  const nextHeading = resolveAdjacentHexDirection(
-    contact.coordinate,
-    nextCoordinate,
-    contact.heading,
-  );
-
   return {
     ...contact,
     coordinate: nextCoordinate,
-    heading: nextHeading,
+    heading: resolveAdjacentHexDirection(contact.coordinate, nextCoordinate, contact.heading),
+    reinterceptCooldownTurns: nextCooldown,
   };
 }
 
 export function advanceAllStrategicContacts(
   contacts: readonly StrategicContactState[],
   routesByContactId: Readonly<Record<string, readonly AxialCoordinate[]>>,
+  grid?: HexGridMap<StrategicMapCell>,
+  theater?: TheaterDefinition,
 ): readonly StrategicContactState[] {
-  return contacts.map((contact) =>
+  const stepped = contacts.map((contact) =>
     advanceSingleMerchantContact(contact, routesByContactId[contact.contactId]),
   );
+  if (grid === undefined || theater === undefined || (theater.routeCorridors?.length ?? 0) === 0) {
+    return stepped;
+  }
+
+  const activeCount = stepped.filter((c) => !c.isSunk && !c.hasReachedDestination).length;
+  return activeCount >= 3
+    ? stepped
+    : [...stepped, createCorridorMerchantContact(grid, theater, stepped.length, 0)];
 }
 
 export function findInterceptableMerchant(
@@ -64,6 +100,8 @@ export function findInterceptableMerchant(
   return contacts.find(
     (contact) =>
       !contact.isSunk &&
+      !contact.hasReachedDestination &&
+      (contact.reinterceptCooldownTurns ?? 0) === 0 &&
       calculateHexDistance(submarineCoordinate, contact.coordinate) <=
         STRATEGIC_INTERCEPTION_RANGE_HEXES,
   );
@@ -75,9 +113,7 @@ function resolveSurfaceShipSpec(
 ): SurfaceShipSpec {
   const spec = theater.surfaceShipCatalog.find((entry) => entry.specId === shipSpecId);
   if (spec === undefined) {
-    throw new Error(
-      `No existe la especificación de buque "${shipSpecId}" en el teatro "${theater.theaterId}".`,
-    );
+    throw new Error(`No existe la especificación "${shipSpecId}" en "${theater.theaterId}".`);
   }
   return spec;
 }

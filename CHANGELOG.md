@@ -8,6 +8,9 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
 ## [Unreleased]
 
 ### Added
+- **Hito 2.1 — `MarineQuadratMapper`, Teatro Atlántico `45x27`, Deriva Comercial y Escala `24H / 4H` (`src/core/hex/`, `src/layers/strategic/domain/`):**
+  - Traductor `O(1)` `MarineQuadratMapper` (`AD..CG`, subsectores `1..9` y subcuadrantes `11..99`) y escenario `NorthAtlanticTheaterData` (`45x27` celdas, Brest/Lorient/Saint-Nazaire, puertos aliados cerrados en Halifax/Liverpool/Gibraltar y corredores `HX`/`ON`/`HG` con deriva `±1 hex`).
+  - Buscador de rutas `StrategicTransitPathfinder` (`1..8 hex`), resolutor `StrategicTurnResolver` con `6` ticks internos de `4h` e interrupción automática *auto-drop*, consumo diésel decimal (`0.1%`) y cierre `ABORTED_AT_SEA`.
 - **Hito 2.0 — Congelación de Contratos Globales de Fase 2 (`src/core/contracts/`):**
   - Nuevos módulos `EnvironmentContracts.ts` y `StrategicIntelContracts.ts` para reloj de guardia de `4h`, meteorología, conos de hidrófono, órdenes/radiogramas del BdU y resumen *Kriegstagebuch*.
   - Ampliados `TheaterDefinition`, `CampaignState`, `EncounterContext`, `FiringSolutionContext` y `EncounterResult` con soporte `ships[]`, puertos aliados bloqueados (`ALLIED_PORT`), corredores comerciales, geometría de intercepción real, persistencia de `fuel`/`battery` y desenlace `TARGET_ESCAPED`.

@@ -50,9 +50,9 @@ describe('StrategicMovementNavigator', () => {
     const stepOne = options.find((opt) => opt.stepDistance === 1);
     const stepTwo = options.find((opt) => opt.stepDistance === 2);
 
-    expect(stepZero).toMatchObject({ fuelDelta: -1, batteryDelta: 30 });
-    expect(stepOne).toMatchObject({ fuelDelta: -2, batteryDelta: 20 });
-    expect(stepTwo).toMatchObject({ fuelDelta: -5, batteryDelta: 10 });
+    expect(stepZero).toMatchObject({ fuelDelta: -0.4, batteryDelta: 30 });
+    expect(stepOne).toMatchObject({ fuelDelta: -0.9, batteryDelta: 20 });
+    expect(stepTwo).toMatchObject({ fuelDelta: -2.8, batteryDelta: 10 });
   });
 
   it('restricts SUBMERGED movement to 0 or 1 hexes and never allows 2 hexes', () => {
@@ -75,13 +75,13 @@ describe('StrategicMovementNavigator', () => {
     expect(anyStepTwo).toBe(false);
   });
 
-  it('disables 2-hex flank movement when SURFACED fuel is below 5', () => {
+  it('disables 2-hex flank movement when SURFACED fuel is below 2.8%', () => {
     const grid = createAtlanticHexGrid();
     const state = createInitialAtlanticCampaignState();
     const lowFuelSubmarine = {
       ...state.submarine,
       coordinate: createAxialCoordinate(2, 2),
-      fuel: 4,
+      fuel: 2.5,
     };
 
     const options = calculateReachableStrategicHexes(grid, lowFuelSubmarine);

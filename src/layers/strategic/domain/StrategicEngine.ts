@@ -4,33 +4,37 @@ import type {
   EncounterContext,
   EncounterResult,
   NavigationStance,
-  StrategicContactState,
+  StrategicTimeScale,
   TheaterDefinition,
 } from '../../../core/contracts/index.ts';
 import { type AxialCoordinate, type HexGridMap, areAxialCoordinatesEqual } from '../../../core/hex/index.ts';
 import {
   ATLANTIC_MERCHANT_ROUTES,
   ATLANTIC_SECTOR_THEATER,
-  DEFAULT_ATLANTIC_WAYPOINTS,
   type StrategicMapCell,
   createAtlanticHexGrid,
-  createInitialAtlanticCampaignState,
 } from './AtlanticSectorScenario.ts';
 import {
-  advanceAllStrategicContacts,
+  NORTH_ATLANTIC_THEATER,
+  createNorthAtlanticHexGrid,
+} from './NorthAtlanticTheaterData.ts';
+import { createInitialNorthAtlanticCampaignState } from './StrategicCorridorGenerator.ts';
+import {
   buildStrategicEncounterContext,
   findInterceptableMerchant,
 } from './StrategicMerchantController.ts';
 import { type ReachableHexOption, calculateReachableStrategicHexes } from './StrategicMovementNavigator.ts';
 import {
-  applyStrategicMovementEnergy,
   canSubmergeSubmarine,
-  clampStrategicResource,
-  completeStrategicTurnArmoryReload,
   switchStrategicSubmarineStance,
 } from './StrategicResourceRules.ts';
+import { applyEncounterOutcomeToCampaign } from './StrategicEncounterOutcomeApplier.ts';
+import {
+  resolveSingleWatchStep,
+  resolveTwentyFourHourTransitMove,
+} from './StrategicTurnResolver.ts';
 
-// Fachada de dominio puro de la capa estratégica; coordina movimiento, consumo, armería y contactos sin acoplarse al DOM ni a Canvas
+// Fachada de dominio puro de la capa estratégica; coordina escala 24H/4H, navegación, consumo, armería y contactos
 
 export interface StrategicEngineOptions {
   readonly initialState?: CampaignState;
@@ -46,9 +50,17 @@ export class StrategicEngine {
   private routesByContactId: Readonly<Record<string, readonly AxialCoordinate[]>>;
 
   public constructor(options: StrategicEngineOptions = {}) {
-    this.state = options.initialState ?? createInitialAtlanticCampaignState();
-    this.grid = options.grid ?? createAtlanticHexGrid();
-    this.theater = options.theater ?? ATLANTIC_SECTOR_THEATER;
+    const isLegacySector =
+      options.initialState?.theaterId === ATLANTIC_SECTOR_THEATER.theaterId;
+    this.theater =
+      options.theater ?? (isLegacySector ? ATLANTIC_SECTOR_THEATER : NORTH_ATLANTIC_THEATER);
+    this.grid =
+      options.grid ??
+      (this.theater.theaterId === ATLANTIC_SECTOR_THEATER.theaterId
+        ? createAtlanticHexGrid()
+        : createNorthAtlanticHexGrid());
+    this.state =
+      options.initialState ?? createInitialNorthAtlanticCampaignState(undefined, this.grid);
     this.routesByContactId = options.routesByContactId ?? ATLANTIC_MERCHANT_ROUTES;
   }
 
@@ -65,7 +77,11 @@ export class StrategicEngine {
   }
 
   public getReachableHexes(): readonly ReachableHexOption[] {
-    return calculateReachableStrategicHexes(this.grid, this.state.submarine);
+    return calculateReachableStrategicHexes(
+      this.grid,
+      this.state.submarine,
+      this.state.timeScale,
+    );
   }
 
   public getReachableOptionAt(destination: AxialCoordinate): ReachableHexOption | undefined {
@@ -78,11 +94,19 @@ export class StrategicEngine {
     return canSubmergeSubmarine(this.state.submarine);
   }
 
+  public setTimeScale(targetScale: StrategicTimeScale): CampaignState {
+    if (targetScale === 'TRANSIT_24H' && this.state.submarine.stance !== 'SURFACED') {
+      throw new Error('El modo TRÁNSITO 24H requiere navegar en superficie (SURFACED).');
+    }
+    this.state = { ...this.state, timeScale: targetScale };
+    return this.state;
+  }
+
   public setStance(targetStance: NavigationStance): CampaignState {
-    this.state = {
-      ...this.state,
-      submarine: switchStrategicSubmarineStance(this.state.submarine, targetStance),
-    };
+    const nextSubmarine = switchStrategicSubmarineStance(this.state.submarine, targetStance);
+    const nextScale: StrategicTimeScale =
+      targetStance === 'SUBMERGED' ? 'PATROL_4H' : this.state.timeScale;
+    this.state = { ...this.state, timeScale: nextScale, submarine: nextSubmarine };
     return this.state;
   }
 
@@ -92,19 +116,13 @@ export class StrategicEngine {
       tubeId,
       this.state.difficulty,
     );
-    this.state = {
-      ...this.state,
-      submarine: { ...this.state.submarine, armory: updatedArmory },
-    };
+    this.state = { ...this.state, submarine: { ...this.state.submarine, armory: updatedArmory } };
     return this.state;
   }
 
   public setReloadPaused(isPaused: boolean): CampaignState {
     const updatedArmory = setArmoryReloadPaused(this.state.submarine.armory, isPaused);
-    this.state = {
-      ...this.state,
-      submarine: { ...this.state.submarine, armory: updatedArmory },
-    };
+    this.state = { ...this.state, submarine: { ...this.state.submarine, armory: updatedArmory } };
     return this.state;
   }
 
@@ -116,16 +134,22 @@ export class StrategicEngine {
       );
     }
 
-    const movedSubmarine = applyStrategicMovementEnergy(this.state.submarine, selectedOption);
-    const reloadedArmory = completeStrategicTurnArmoryReload(movedSubmarine.armory, this.state.difficulty);
-    const updatedContacts = advanceAllStrategicContacts(this.state.contacts, this.routesByContactId);
-
-    this.state = {
-      ...this.state,
-      turnNumber: this.state.turnNumber + 1,
-      submarine: { ...movedSubmarine, armory: reloadedArmory },
-      contacts: updatedContacts,
-    };
+    this.state =
+      this.state.timeScale === 'TRANSIT_24H'
+        ? resolveTwentyFourHourTransitMove(
+            this.state,
+            selectedOption,
+            this.grid,
+            this.theater,
+            this.routesByContactId,
+          )
+        : resolveSingleWatchStep(
+            this.state,
+            selectedOption,
+            this.grid,
+            this.theater,
+            this.routesByContactId,
+          );
     return this.state;
   }
 
@@ -141,38 +165,15 @@ export class StrategicEngine {
   }
 
   public applyEncounterResult(result: EncounterResult): CampaignState {
-    const nextHull = clampStrategicResource(this.state.submarine.hullIntegrity - result.hullDamageTaken);
-    const updatedContacts: StrategicContactState[] = this.state.contacts.map((contact) =>
-      contact.contactId === result.contactId && result.isTargetSunk
-        ? { ...contact, isSunk: true }
-        : contact,
+    const applied = applyEncounterOutcomeToCampaign(
+      this.state,
+      result,
+      this.grid,
+      this.theater,
+      this.routesByContactId,
     );
-
-    if (result.isTargetSunk && this.theater.surfaceShipCatalog.length > 0) {
-      updatedContacts.push(this.spawnReplacementMerchant(updatedContacts.length));
-    }
-
-    this.state = {
-      ...this.state,
-      submarine: { ...this.state.submarine, hullIntegrity: nextHull, armory: result.updatedArmory },
-      contacts: updatedContacts,
-      totalSunkTonnage: this.state.totalSunkTonnage + result.sunkTonnageAwarded,
-    };
+    this.routesByContactId = applied.nextRoutes;
+    this.state = applied.nextState;
     return this.state;
-  }
-
-  private spawnReplacementMerchant(contactOrdinal: number): StrategicContactState {
-    const catalog = this.theater.surfaceShipCatalog;
-    const nextSpec = catalog[contactOrdinal % catalog.length]!;
-    const spawnWaypoint = DEFAULT_ATLANTIC_WAYPOINTS[(contactOrdinal * 3) % DEFAULT_ATLANTIC_WAYPOINTS.length]!;
-    const newContactId = `merchant_${contactOrdinal + 1}`;
-    this.routesByContactId = { ...this.routesByContactId, [newContactId]: DEFAULT_ATLANTIC_WAYPOINTS };
-    return {
-      contactId: newContactId,
-      shipSpecId: nextSpec.specId,
-      coordinate: spawnWaypoint,
-      heading: 0,
-      isSunk: false,
-    };
   }
 }

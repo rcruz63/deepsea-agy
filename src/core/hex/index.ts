@@ -37,3 +37,16 @@ export {
 
 export { HexGridMap } from './HexGridMap.ts';
 export type { HexCell } from './HexGridMap.ts';
+
+export {
+  DEFAULT_NORTH_ATLANTIC_QUADRAT_SPEC,
+  axialToOffsetColumnRow,
+  isCoordinateInsidePatrolSector,
+  offsetColumnRowToAxialCoord,
+  resolveMarineQuadrat,
+  resolveSectorCenterCoordinate,
+} from './MarineQuadratMapper.ts';
+export type {
+  MarineQuadratDesignation,
+  OffsetCoordinate,
+} from './MarineQuadratMapper.ts';

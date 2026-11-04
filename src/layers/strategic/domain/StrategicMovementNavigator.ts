@@ -1,25 +1,32 @@
 import type {
   NavigationStance,
+  StrategicTimeScale,
   SubmarineState,
 } from '../../../core/contracts/index.ts';
 import {
   type AxialCoordinate,
   type HexDirection,
+  type HexGridMap,
   type HexKey,
   resolveAdjacentHexDirection,
   toHexKey,
 } from '../../../core/hex/index.ts';
-import { HexGridMap } from '../../../core/hex/index.ts';
 import {
   type StrategicMapCell,
   isNavigableStrategicTerrain,
 } from './AtlanticSectorScenario.ts';
+import {
+  ECONOMICAL_SURFACED_FUEL_PER_HEX,
+  FLANK_PATROL_FOUR_HOUR_FUEL_COST,
+  STATIONARY_SURFACED_FUEL_COST,
+} from './StrategicResourceRules.ts';
+import { calculateReachableTransitRoutes } from './StrategicTransitPathfinder.ts';
 
 export { resolveAdjacentHexDirection };
 
-// Calcula el abanico de movimiento de 0, 1 y 2 hexágonos por turno sin bucles anidados ni saltos sobre costa intransitable
+// Calcula destinos alcanzables en PATRULLA 4H (0..2 hex) y delega TRÁNSITO 24H (0..8 hex) sin bucles anidados
 
-export type StrategicStepDistance = 0 | 1 | 2;
+export type StrategicStepDistance = number;
 
 export interface ReachableHexOption {
   readonly coordinate: AxialCoordinate;
@@ -27,6 +34,7 @@ export interface ReachableHexOption {
   readonly fuelDelta: number;
   readonly batteryDelta: number;
   readonly resultingHeading: HexDirection;
+  readonly pathSteps?: readonly AxialCoordinate[];
 }
 
 interface MovementEnergyDelta {
@@ -34,15 +42,13 @@ interface MovementEnergyDelta {
   readonly batteryDelta: number;
 }
 
-const SURFACED_ENERGY_BY_STEP: Readonly<
-  Record<StrategicStepDistance, MovementEnergyDelta>
-> = {
-  0: { fuelDelta: -1, batteryDelta: 30 },
-  1: { fuelDelta: -2, batteryDelta: 20 },
-  2: { fuelDelta: -5, batteryDelta: 10 },
+const SURFACED_PATROL_ENERGY: Readonly<Record<0 | 1 | 2, MovementEnergyDelta>> = {
+  0: { fuelDelta: -STATIONARY_SURFACED_FUEL_COST, batteryDelta: 30 },
+  1: { fuelDelta: -ECONOMICAL_SURFACED_FUEL_PER_HEX, batteryDelta: 20 },
+  2: { fuelDelta: -FLANK_PATROL_FOUR_HOUR_FUEL_COST, batteryDelta: 10 },
 };
 
-const SUBMERGED_ENERGY_BY_STEP: Readonly<Record<0 | 1, MovementEnergyDelta>> = {
+const SUBMERGED_PATROL_ENERGY: Readonly<Record<0 | 1, MovementEnergyDelta>> = {
   0: { fuelDelta: 0, batteryDelta: -5 },
   1: { fuelDelta: 0, batteryDelta: -15 },
 };
@@ -53,27 +59,15 @@ function isNavigableCell(cell: StrategicMapCell): boolean {
 
 export function getMovementEnergyDelta(
   stance: NavigationStance,
-  stepDistance: StrategicStepDistance,
+  stepDistance: 0 | 1 | 2,
 ): MovementEnergyDelta {
   if (stance === 'SURFACED') {
-    return SURFACED_ENERGY_BY_STEP[stepDistance];
+    return SURFACED_PATROL_ENERGY[stepDistance];
   }
   if (stepDistance === 2) {
     throw new Error('Un submarino sumergido nunca puede desplazarse 2 hexágonos en un turno.');
   }
-  return SUBMERGED_ENERGY_BY_STEP[stepDistance];
-}
-
-function canExecuteStepOne(submarine: SubmarineState): boolean {
-  if (submarine.stance === 'SURFACED') {
-    return submarine.fuel >= 2;
-  }
-  return submarine.battery > 0;
-}
-
-function canExecuteStepTwo(submarine: SubmarineState): boolean {
-  // Forzar máquinas a 2 hexágonos exige navegar en superficie con diésel suficiente para cubrir los 5 puntos de consumo
-  return submarine.stance === 'SURFACED' && submarine.fuel >= 5;
+  return SUBMERGED_PATROL_ENERGY[stepDistance];
 }
 
 function collectStepOneOptions(
@@ -97,16 +91,17 @@ function collectStepOneOptions(
         cell.coordinate,
         submarine.heading,
       ),
+      pathSteps: [cell.coordinate],
     });
   }
 
   return stepOneCoordinates;
 }
 
-// Expande el segundo anillo desde cada celda intermedia navegable para impedir que el submarino salte sobre penínsulas o escollos
 function collectStepTwoFromIntermediateCell(
   grid: HexGridMap<StrategicMapCell>,
   intermediateCoordinate: AxialCoordinate,
+  originOption: ReachableHexOption,
   fallbackHeading: HexDirection,
   optionsByKey: Map<HexKey, ReachableHexOption>,
 ): void {
@@ -126,6 +121,7 @@ function collectStepTwoFromIntermediateCell(
           targetCell.coordinate,
           fallbackHeading,
         ),
+        pathSteps: [...(originOption.pathSteps ?? []), targetCell.coordinate],
       });
     }
   }
@@ -134,32 +130,43 @@ function collectStepTwoFromIntermediateCell(
 export function calculateReachableStrategicHexes(
   grid: HexGridMap<StrategicMapCell>,
   submarine: SubmarineState,
+  timeScale: StrategicTimeScale = 'PATROL_4H',
 ): readonly ReachableHexOption[] {
+  if (timeScale === 'TRANSIT_24H' && submarine.stance === 'SURFACED') {
+    return calculateReachableTransitRoutes(grid, submarine).map((route) => ({
+      coordinate: route.coordinate,
+      stepDistance: route.stepDistance,
+      fuelDelta: route.totalFuelDelta,
+      batteryDelta: 100,
+      resultingHeading: route.resultingHeading,
+      pathSteps: route.pathSteps,
+    }));
+  }
+
   const optionsByKey = new Map<HexKey, ReachableHexOption>();
   const stationaryEnergy = getMovementEnergyDelta(submarine.stance, 0);
-
   optionsByKey.set(toHexKey(submarine.coordinate), {
     coordinate: submarine.coordinate,
     stepDistance: 0,
     fuelDelta: stationaryEnergy.fuelDelta,
     batteryDelta: stationaryEnergy.batteryDelta,
     resultingHeading: submarine.heading,
+    pathSteps: [],
   });
 
-  if (!canExecuteStepOne(submarine)) {
+  const canStepOne =
+    submarine.stance === 'SURFACED'
+      ? submarine.fuel >= ECONOMICAL_SURFACED_FUEL_PER_HEX
+      : submarine.battery > 0;
+  if (!canStepOne) {
     return Array.from(optionsByKey.values());
   }
 
-  const stepOneCoordinates = collectStepOneOptions(grid, submarine, optionsByKey);
-
-  if (canExecuteStepTwo(submarine)) {
-    for (const intermediateCoordinate of stepOneCoordinates) {
-      collectStepTwoFromIntermediateCell(
-        grid,
-        intermediateCoordinate,
-        submarine.heading,
-        optionsByKey,
-      );
+  const stepOneCoords = collectStepOneOptions(grid, submarine, optionsByKey);
+  if (submarine.stance === 'SURFACED' && submarine.fuel >= FLANK_PATROL_FOUR_HOUR_FUEL_COST) {
+    for (const midCoord of stepOneCoords) {
+      const midOption = optionsByKey.get(toHexKey(midCoord))!;
+      collectStepTwoFromIntermediateCell(grid, midCoord, midOption, submarine.heading, optionsByKey);
     }
   }
 
