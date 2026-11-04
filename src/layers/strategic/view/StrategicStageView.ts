@@ -1,25 +1,40 @@
 import type { EncounterContext } from '../../../core/contracts/index.ts';
 import type { AxialCoordinate, Point2D } from '../../../core/hex/index.ts';
 import type { StrategicEngine } from '../domain/StrategicEngine.ts';
+import { buildHistoricalChartBackdrop } from './HistoricalChartBackdropBuilder.ts';
+import { StrategicCameraController } from './StrategicCameraController.ts';
 import {
+  type HudBlockingRect,
   type HudInteractiveRegion,
-  renderStrategicHudPanel,
+  renderStrategicFloatingCartouches,
 } from './StrategicHudRenderer.ts';
 import {
-  type StrategicUserInteraction,
+  dispatchStrategicInteraction,
+  isScreenPointOverStrategicHud,
   resolveStrategicClickInteraction,
   resolveStrategicHoveredHex,
 } from './StrategicInputHandler.ts';
-import { renderStrategicMapChart } from './StrategicMapRenderer.ts';
-import { renderStrategicUnitsAndLegend } from './StrategicUnitRenderer.ts';
+import { renderStrategicIntelOverlay } from './StrategicIntelOverlayRenderer.ts';
+import {
+  computeStrategicWorldBounds,
+  projectStrategicHexCenter,
+  renderStrategicMapWorld,
+} from './StrategicMapRenderer.ts';
+import { renderStrategicTopCommandBar } from './StrategicTopBarRenderer.ts';
+import { renderStrategicUnitsWorld } from './StrategicUnitRenderer.ts';
 
-// Coordina los tres sub-renderizadores estratégicos y despacha las órdenes del jugador hacia StrategicEngine
+// Coordina cámara pan/zoom, lámina histórica cacheada, niebla de guerra y HUD flotante de la capa estratégica
 
 export class StrategicStageView {
   private readonly engine: StrategicEngine;
   private readonly onEnterEncounter: (context: EncounterContext) => void;
+  private readonly camera = new StrategicCameraController();
+  private backdropCanvas: HTMLCanvasElement | null = null;
   private hoveredHex: AxialCoordinate | null = null;
   private lastHudRegions: readonly HudInteractiveRegion[] = [];
+  private lastBlockingRects: readonly HudBlockingRect[] = [];
+  private lastViewportWidth = 1280;
+  private lastViewportHeight = 800;
 
   public constructor(
     engine: StrategicEngine,
@@ -27,87 +42,125 @@ export class StrategicStageView {
   ) {
     this.engine = engine;
     this.onEnterEncounter = onEnterEncounter;
-  }
-
-  public handlePointerMove(canvasPoint: Point2D): void {
-    this.hoveredHex = resolveStrategicHoveredHex(canvasPoint);
-  }
-
-  public handlePointerClick(canvasPoint: Point2D): void {
-    const interaction = resolveStrategicClickInteraction(
-      canvasPoint,
-      this.lastHudRegions,
+    const theater = engine.getTheater();
+    this.camera.setWorldBounds(
+      computeStrategicWorldBounds(theater.gridWidth, theater.gridHeight),
     );
-    if (interaction === null) {
-      return;
-    }
-    this.applyUserInteraction(interaction);
+    this.backdropCanvas = buildHistoricalChartBackdrop(engine.getGrid(), theater);
   }
 
-  private applyUserInteraction(interaction: StrategicUserInteraction): void {
-    const state = this.engine.getState();
+  public getBackdropCanvas(): HTMLCanvasElement | null {
+    return this.backdropCanvas;
+  }
 
-    switch (interaction.type) {
-      case 'TOGGLE_STANCE': {
-        const nextStance =
-          state.submarine.stance === 'SURFACED' ? 'SUBMERGED' : 'SURFACED';
-        if (nextStance === 'SURFACED' || this.engine.canSubmerge()) {
-          this.engine.setStance(nextStance);
-        }
-        return;
-      }
-      case 'HOLD_POSITION': {
-        this.engine.executeTurnMove(state.submarine.coordinate);
-        return;
-      }
-      case 'RELOAD_TUBE': {
-        this.engine.startTubeReload(interaction.tubeId);
-        return;
-      }
-      case 'INTERCEPT_CONTACT': {
-        const encounterContext = this.engine.createEncounterContext();
-        if (encounterContext !== null) {
-          this.onEnterEncounter(encounterContext);
-        }
-        return;
-      }
-      case 'MOVE_TO_HEX': {
-        const option = this.engine.getReachableOptionAt(interaction.coordinate);
-        if (option !== undefined) {
-          this.engine.executeTurnMove(option.coordinate);
-        }
-        return;
-      }
+  public canStartDragPanAt(screenPoint: Point2D): boolean {
+    return !isScreenPointOverStrategicHud(screenPoint, this.lastBlockingRects);
+  }
+
+  public handlePointerDragPan(deltaX: number, deltaY: number): void {
+    this.camera.panByScreenDelta(
+      deltaX,
+      deltaY,
+      this.lastViewportWidth,
+      this.lastViewportHeight,
+    );
+  }
+
+  public handleWheelZoom(screenPoint: Point2D, wheelDeltaY: number): void {
+    this.camera.zoomAtScreenPoint(
+      screenPoint,
+      wheelDeltaY,
+      this.lastViewportWidth,
+      this.lastViewportHeight,
+    );
+  }
+
+  public handlePointerMove(screenPoint: Point2D): void {
+    this.hoveredHex = resolveStrategicHoveredHex(
+      screenPoint,
+      this.lastBlockingRects,
+      this.camera,
+    );
+  }
+
+  public handlePointerClick(screenPoint: Point2D): void {
+    const interaction = resolveStrategicClickInteraction(
+      screenPoint,
+      this.lastHudRegions,
+      this.lastBlockingRects,
+      this.camera,
+    );
+    if (interaction !== null) {
+      dispatchStrategicInteraction(
+        this.engine,
+        interaction,
+        (coord, zoom) => this.centerCameraOnCoordinate(coord, zoom),
+        this.onEnterEncounter,
+      );
     }
   }
 
-  public render(context: CanvasRenderingContext2D): void {
+  public centerCameraOnCoordinate(coord: AxialCoordinate, zoom?: number): void {
+    this.camera.focusOnWorldPoint(
+      projectStrategicHexCenter(coord),
+      this.lastViewportWidth,
+      this.lastViewportHeight,
+      zoom,
+    );
+  }
+
+  public render(
+    context: CanvasRenderingContext2D,
+    viewportWidth = 1280,
+    viewportHeight = 800,
+  ): void {
+    this.lastViewportWidth = viewportWidth;
+    this.lastViewportHeight = viewportHeight;
     const state = this.engine.getState();
     const theater = this.engine.getTheater();
-    const reachableOptions = this.engine.getReachableHexes();
-    const interceptableContact = this.engine.getInterceptableContact();
+    const worldBounds = computeStrategicWorldBounds(theater.gridWidth, theater.gridHeight);
 
-    renderStrategicMapChart(
+    if (!this.camera.isInitialized()) {
+      this.centerCameraOnCoordinate(state.submarine.coordinate, 0.92);
+    }
+
+    context.fillStyle = '#050d12';
+    context.fillRect(0, 0, viewportWidth, viewportHeight);
+
+    context.save();
+    this.camera.applyTransform(context);
+    renderStrategicMapWorld(
       context,
+      this.backdropCanvas,
       this.engine.getGrid(),
-      reachableOptions,
+      state,
+      theater.marineQuadratSpec,
+      this.engine.getReachableHexes(),
       this.hoveredHex,
-      theater.name,
+      this.camera,
+      worldBounds,
     );
+    renderStrategicIntelOverlay(context, state, theater.marineQuadratSpec);
+    const interceptable = this.engine.getInterceptableContact();
+    renderStrategicUnitsWorld(context, state, theater, interceptable?.contactId ?? null);
+    context.restore();
 
-    renderStrategicUnitsAndLegend(
+    const topRegions = renderStrategicTopCommandBar(
       context,
       state,
-      theater.bases,
-      interceptableContact?.contactId ?? null,
-      this.hoveredHex,
-    );
-
-    this.lastHudRegions = renderStrategicHudPanel(
-      context,
-      state,
+      theater.marineQuadratSpec,
       this.engine.canSubmerge(),
-      interceptableContact !== undefined,
+      viewportWidth,
     );
+    const cartouches = renderStrategicFloatingCartouches(
+      context,
+      state,
+      interceptable !== undefined,
+      false,
+      viewportWidth,
+      viewportHeight,
+    );
+    this.lastHudRegions = [...topRegions, ...cartouches.interactiveRegions];
+    this.lastBlockingRects = cartouches.blockingRects;
   }
 }

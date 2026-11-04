@@ -8,6 +8,9 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
 ## [Unreleased]
 
 ### Added
+- **Hito 2.4 — Viewport `100% x 100dvh` HiDPI, Lámina Histórica `N.º 1546` y Cámara *Pan & Zoom* (`src/shell/`, `src/layers/strategic/view/`, `index.html`, `src/main.ts`):**
+  - `ViewportFrameComposer` con `ResizeObserver` + `devicePixelRatio` que adapta el lienzo a ventana completa en Estratégico y enmarca `960x640` sobre la carta histórica oscurecida en Táctico y Periscopio.
+  - `HistoricalChartBackdropBuilder` (lámina envejecida *Marinequadratkarte Nr. 1546* alineada 1:1 con `45x27`, serif hueca `AD..CG` y LOD `11..99`), `StrategicCameraController` (*pan & zoom* centrado en cursor), `StrategicIntelOverlayRenderer`, `StrategicTopBarRenderer` y cartelas flotantes inferiores con salto de cámara a radiogramas BdU.
 - **Hito 2.3 — Geometría Real de Entrada al `15x15`, Persistencia Energética y Escape con Consecuencia (`src/layers/tactical/`, `src/layers/strategic/domain/`):**
   - Módulo `TacticalSpawnGeometry` que proyecta el rumbo real del mercante sobre el centro `(4, 7)` (`11` turnos garantizados en las `6` direcciones) y despliega al U-Boot a `4 hex` (`2000m`) o `6 hex` (`3000m`) según `interceptionDistanceHexes` y `approachDirection`.
   - Indicador de entorno (`TimeOfDay` y `WeatherState`) en `TacticalHudRenderer`, desenlace `TARGET_ESCAPED` al escapar del tablero `15x15`, persistencia decimal `0.1%` de `fuel`/`battery` hacia `CampaignState` y avance `+1 hex` con `reinterceptCooldownTurns = 1` del contacto escapado.

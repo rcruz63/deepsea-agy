@@ -1,176 +1,164 @@
 import { canStartTorpedoReloadInArmory } from '../../../core/armory/index.ts';
-import type {
-  CampaignState,
-  TorpedoTubeState,
-} from '../../../core/contracts/index.ts';
+import type { CampaignState, TorpedoTubeState } from '../../../core/contracts/index.ts';
+import {
+  type HudBlockingRect,
+  type HudInteractiveRegion,
+  drawCartoucheButton,
+  drawCartoucheFrame,
+} from './StrategicHudPrimitives.ts';
 
-// Dibuja el panel instrumental derecho (HUD) con recursos 0..100, postura, estado individual de los 5 tubos y botón de intercepción
+export type { HudBlockingRect, HudInteractiveRegion } from './StrategicHudPrimitives.ts';
 
-export interface HudInteractiveRegion {
-  readonly actionId: string;
-  readonly x: number;
-  readonly y: number;
-  readonly width: number;
-  readonly height: number;
-  readonly isEnabled: boolean;
-}
+// Dibuja las dos cartelas flotantes inferiores (BdU/Hidrófono a babor; Tubos y Acción Contextual a estribor)
 
-function drawResourceGauge(
-  context: CanvasRenderingContext2D,
-  label: string,
-  percentage: number,
+function renderIntelCartouche(
+  ctx: CanvasRenderingContext2D,
+  state: CampaignState,
   x: number,
   y: number,
-  barColor: string,
-): void {
-  context.fillStyle = '#a8dadc';
-  context.font = 'bold 11px monospace';
-  context.textAlign = 'left';
-  context.fillText(`${label}: ${percentage}%`, x, y);
+  regions: HudInteractiveRegion[],
+): HudBlockingRect {
+  const width = 364;
+  const height = 162;
+  const rect = drawCartoucheFrame(ctx, x, y, width, height);
 
-  context.strokeStyle = '#2a6f64';
-  context.strokeRect(x, y + 6, 250, 14);
-  const fillWidth = Math.round((Math.max(0, Math.min(100, percentage)) / 100) * 246);
-  context.fillStyle = barColor;
-  context.fillRect(x + 2, y + 8, fillWidth, 10);
-}
+  ctx.fillStyle = '#c6a664';
+  ctx.font = 'bold 11px monospace';
+  ctx.textAlign = 'left';
+  const order = state.activePatrolOrder;
+  const orderText =
+    order === null
+      ? 'ORDEN BdU: Patrulla libre'
+      : order.isFulfilled
+        ? `ORDEN BdU: Sector ${order.targetSectorCode} [CUMPLIDA ✓]`
+        : `ORDEN BdU: Patrullar ${order.targetSectorCode} (${order.completedWatchTurns}/${order.requiredWatchTurns})`;
+  ctx.fillText(orderText, x + 12, y + 20);
 
-function resolveTubeBadgeColor(status: TorpedoTubeState['status']): string {
-  switch (status) {
-    case 'LOADED':
-      return '#00ffaa';
-    case 'RELOADING':
-      return '#ffd166';
-    case 'EMPTY':
-      return '#6c757d';
-    case 'DAMAGED':
-      return '#ef476f';
+  const isSub = state.submarine.stance === 'SUBMERGED';
+  ctx.fillStyle = isSub ? '#4cc9f0' : '#9bb5b8';
+  ctx.font = '10px monospace';
+  const radioHeader = isSub
+    ? state.queuedSubmergedRadiograms.length > 0
+      ? `ANTENA EN INMERSIÓN: ${state.queuedSubmergedRadiograms.length} aviso(s) retenidos`
+      : 'ANTENA EN INMERSIÓN · RONDA HIDROFÓNICA ACTIVA'
+    : 'RADIOGRAMAS BdU (clic para centrar en carta):';
+  ctx.fillText(radioHeader, x + 12, y + 38);
+
+  const latestReports = state.deliveredRadiograms.slice(-2).reverse();
+  let rowY = y + 46;
+  for (const report of latestReports) {
+    const ageHours = Math.max(0, (state.turnNumber - report.createdAtTurn) * 4);
+    regions.push(
+      drawCartoucheButton(
+        ctx,
+        { actionId: `FOCUS_REPORT:${report.reportId}`, x: x + 12, y: rowY, width: width - 24, height: 26, isEnabled: true },
+        `⌖ ${report.reportedQuadratCode} · Rumbo ${report.estimatedHeading} · hace ${ageHours}h`,
+        '#ffd166',
+      ),
+    );
+    rowY += 30;
   }
+
+  const hydroText = !isSub
+    ? 'HIDRÓFONO: Inactivo en superficie (ruido diésel)'
+    : state.hydrophoneContacts.length === 0
+      ? 'HIDRÓFONO: Sin hélices en rango (3..5 hex)'
+      : `HIDRÓFONO: ${state.hydrophoneContacts
+          .slice(0, 2)
+          .map((h) => `${h.estimatedBearingDeg}°±15°[${h.strength}]`)
+          .join(' | ')}`;
+  ctx.fillStyle = state.hydrophoneContacts.length > 0 ? '#4cc9f0' : '#7c989c';
+  ctx.font = '10px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(hydroText, x + 12, y + height - 12);
+  return rect;
 }
 
-function renderTubeStatusRow(
-  context: CanvasRenderingContext2D,
+function renderTubeChip(
+  ctx: CanvasRenderingContext2D,
   tube: TorpedoTubeState,
   canReload: boolean,
+  x: number,
   y: number,
 ): HudInteractiveRegion {
-  const x = 680;
-  const width = 250;
-  const height = 28;
-
-  context.fillStyle = '#0a1e26';
-  context.fillRect(x, y, width, height);
-  context.strokeStyle = canReload ? '#ffd166' : '#1f544c';
-  context.lineWidth = 1.2;
-  context.strokeRect(x, y, width, height);
-
-  context.fillStyle = '#e0fbfc';
-  context.font = 'bold 11px monospace';
-  context.textAlign = 'left';
-  context.fillText(tube.tubeId, x + 10, y + 18);
-
-  context.fillStyle = resolveTubeBadgeColor(tube.status);
-  const statusLabel =
-    tube.status === 'EMPTY' && canReload
-      ? 'EMPTY [CLIC RECARGAR]'
+  const shortId = tube.tubeId.replace('BOW-', 'B').replace('STERN-', 'S');
+  const statusChar =
+    tube.status === 'LOADED' ? '●' : tube.status === 'RELOADING' ? `${tube.remainingReloadTurns}t` : '○';
+  const color =
+    tube.status === 'LOADED'
+      ? '#00ffaa'
       : tube.status === 'RELOADING'
-        ? `RELOADING (${tube.remainingReloadTurns}t)`
-        : tube.status;
-  context.textAlign = 'right';
-  context.fillText(statusLabel, x + width - 10, y + 18);
-
-  return { actionId: `RELOAD_TUBE:${tube.tubeId}`, x, y, width, height, isEnabled: canReload };
+        ? '#ffd166'
+        : canReload
+          ? '#ff9f1c'
+          : '#5c7378';
+  return drawCartoucheButton(
+    ctx,
+    { actionId: `RELOAD_TUBE:${tube.tubeId}`, x, y, width: 66, height: 28, isEnabled: canReload },
+    `${shortId}:${statusChar}`,
+    color,
+  );
 }
 
-function renderActionButton(
-  context: CanvasRenderingContext2D,
-  region: HudInteractiveRegion,
-  label: string,
-  highlightColor: string,
-): HudInteractiveRegion {
-  const { x, y, width, height, isEnabled } = region;
-  context.fillStyle = isEnabled ? 'rgba(0, 255, 170, 0.14)' : '#09161c';
-  context.fillRect(x, y, width, height);
-  context.strokeStyle = isEnabled ? highlightColor : '#284b47';
-  context.lineWidth = isEnabled ? 1.8 : 1;
-  context.strokeRect(x, y, width, height);
-
-  context.fillStyle = isEnabled ? highlightColor : '#4a6b65';
-  context.font = 'bold 11px monospace';
-  context.textAlign = 'center';
-  context.fillText(label, x + width / 2, y + height / 2 + 4);
-  return region;
-}
-
-export function renderStrategicHudPanel(
+export function renderStrategicFloatingCartouches(
   context: CanvasRenderingContext2D,
   state: CampaignState,
-  canSubmerge: boolean,
   hasInterceptableContact: boolean,
-): readonly HudInteractiveRegion[] {
-  const interactiveRegions: HudInteractiveRegion[] = [];
-  const { submarine, difficulty } = state;
+  canDockAtBase: boolean,
+  viewportWidth: number,
+  viewportHeight: number,
+): {
+  readonly interactiveRegions: readonly HudInteractiveRegion[];
+  readonly blockingRects: readonly HudBlockingRect[];
+} {
+  const regions: HudInteractiveRegion[] = [];
+  const bottomY = Math.max(64, viewportHeight - 176);
+  const leftRect = renderIntelCartouche(context, state, 16, bottomY, regions);
 
-  context.fillStyle = '#07141a';
-  context.fillRect(660, 0, 300, 640);
-  context.strokeStyle = '#246a5e';
-  context.lineWidth = 2;
-  context.strokeRect(662, 12, 286, 616);
+  const rightW = 372;
+  const rightH = 162;
+  const rightX = Math.max(392, viewportWidth - rightW - 16);
+  const rightRect = drawCartoucheFrame(context, rightX, bottomY, rightW, rightH);
 
-  context.fillStyle = '#63f5c4';
-  context.font = 'bold 13px monospace';
+  const resLabel = state.difficulty.hasInfiniteReserveTorpedoes
+    ? '∞'
+    : String(state.submarine.armory.reserveTorpedoes);
+  context.fillStyle = '#c6a664';
+  context.font = 'bold 11px monospace';
   context.textAlign = 'left';
-  context.fillText(`TURNO #${state.turnNumber} (${state.turnNumber * 4}H)`, 680, 38);
-  context.fillStyle = '#ffd166';
-  context.fillText(`TONELAJE: ${state.totalSunkTonnage} BRT`, 680, 58);
+  context.fillText(`TUBOS (RESERVA: ${resLabel}) · CLIC EN VACÍO RECARGA`, rightX + 12, bottomY + 20);
 
-  const canSwitchStance = submarine.stance === 'SUBMERGED' || canSubmerge;
-  const stanceLabel =
-    submarine.stance === 'SURFACED'
-      ? 'POSTURA: SUPERFICIE [SUMERGIR]'
-      : 'POSTURA: SUMERGIDO [EMERGER]';
-  interactiveRegions.push(
-    renderActionButton(
+  const tubes = [...state.submarine.armory.bowTubes, ...state.submarine.armory.sternTubes];
+  for (let i = 0; i < tubes.length; i += 1) {
+    const tube = tubes[i]!;
+    const canReload = canStartTorpedoReloadInArmory(state.submarine.armory, tube.tubeId, state.difficulty);
+    regions.push(renderTubeChip(context, tube, canReload, rightX + 12 + i * 70, bottomY + 28));
+  }
+
+  regions.push(
+    drawCartoucheButton(
       context,
-      { actionId: 'TOGGLE_STANCE', x: 680, y: 72, width: 250, height: 34, isEnabled: canSwitchStance },
-      stanceLabel,
-      submarine.stance === 'SURFACED' ? '#00ffaa' : '#4cc9f0',
-    ),
-    renderActionButton(
-      context,
-      { actionId: 'HOLD_POSITION', x: 680, y: 114, width: 250, height: 32, isEnabled: true },
-      'MANTENER POSICIÓN (0 HEX)',
+      { actionId: 'HOLD_POSITION', x: rightX + 12, y: bottomY + 66, width: rightW - 24, height: 32, isEnabled: true },
+      state.timeScale === 'TRANSIT_24H' ? 'MANTENER POSICIÓN (24H)' : 'MANTENER POSICIÓN / ESCUCHA (4H)',
       '#a8dadc',
     ),
   );
 
-  drawResourceGauge(context, 'COMBUSTIBLE DIÉSEL', submarine.fuel, 680, 168, '#00ffaa');
-  drawResourceGauge(context, 'BATERÍA ELÉCTRICA', submarine.battery, 680, 212, '#4cc9f0');
-
-  const reserveLabel = difficulty.hasInfiniteReserveTorpedoes
-    ? '∞ (EASY)'
-    : String(submarine.armory.reserveTorpedoes);
-  context.fillStyle = '#63f5c4';
-  context.font = 'bold 12px monospace';
-  context.textAlign = 'left';
-  context.fillText(`TUBOS LANZATORPEDOS (RES: ${reserveLabel})`, 680, 264);
-
-  const allTubes = [...submarine.armory.bowTubes, ...submarine.armory.sternTubes];
-  let currentTubeY = 276;
-  for (const tube of allTubes) {
-    const canReload = canStartTorpedoReloadInArmory(submarine.armory, tube.tubeId, difficulty);
-    interactiveRegions.push(renderTubeStatusRow(context, tube, canReload, currentTubeY));
-    currentTubeY += 34;
-  }
-
-  interactiveRegions.push(
-    renderActionButton(
+  const primaryActionId = canDockAtBase ? 'DOCK_AT_BASE' : 'INTERCEPT_CONTACT';
+  const primaryEnabled = canDockAtBase || hasInterceptableContact;
+  const primaryLabel = canDockAtBase
+    ? '⚓ ATRACAR EN BASE NAVAL (CERRAR PATRULLA)'
+    : hasInterceptableContact
+      ? '⚔ ¡INTERCEPTAR CONTACTO! (A TÁCTICO 15x15)'
+      : 'EN PATRULLA (SIN CONTACTO A TIRO)';
+  regions.push(
+    drawCartoucheButton(
       context,
-      { actionId: 'INTERCEPT_CONTACT', x: 680, y: 560, width: 250, height: 46, isEnabled: hasInterceptableContact },
-      hasInterceptableContact ? '¡INTERCEPTAR CONTACTO! (DIST <= 1)' : 'SIN CONTACTO EN RANGO (DIST > 1)',
-      '#ff9f1c',
+      { actionId: primaryActionId, x: rightX + 12, y: bottomY + 106, width: rightW - 24, height: 42, isEnabled: primaryEnabled },
+      primaryLabel,
+      canDockAtBase ? '#00ffaa' : '#ff9f1c',
     ),
   );
 
-  return interactiveRegions;
+  return { interactiveRegions: regions, blockingRects: [leftRect, rightRect] };
 }

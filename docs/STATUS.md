@@ -1,9 +1,13 @@
 # ESTADO DEL PROYECTO (HANDOFF & TRACKING)
 
 ## Estado Actual (Resumen Ejecutivo)
-**Fase 2 en ejecución — Hito 2.3 (Geometría Real de Entrada al `15x15`, Persistencia Energética y Escape con Consecuencia) completado y verificado** (`tsc --noEmit` limpio y 19 suites / 78 tests en verde, todos los archivos `< 200` líneas). Listo para implementar el **Hito 2.4 (Viewport `100vw x 100vh` HiDPI, Lámina Histórica `N.º 1546` y Cámara *Pan & Zoom*)**.
+**Fase 2 en ejecución — Hito 2.4 (Viewport `100% x 100dvh` HiDPI, Lámina Histórica `N.º 1546`, Cámara *Pan & Zoom* y HUD Flotante) completado y verificado** (`tsc --noEmit` limpio, `vite build` limpio y 20 suites / 80 tests en verde, todos los archivos `< 200` líneas). Listo para implementar el **Hito 2.5 (Retorno a Base Naval, *Kriegstagebuch* y Campaña Multi-Patrulla)**.
 
 ## Completado Recientemente
+- **Hito 2.4 — Viewport `100% x 100dvh` HiDPI, Lámina Histórica `N.º 1546` y Cámara *Pan & Zoom* (`src/shell/`, `src/layers/strategic/view/`, `index.html`, `src/main.ts`):**
+  - Creado `ViewportFrameComposer.ts` con `ResizeObserver` + `devicePixelRatio` para ocupar el `100% x 100dvh` en Estratégico y centrar/escalar las consolas `960x640` de Táctico y Periscopio sobre la lámina histórica atenuada.
+  - Creados `HistoricalChartBackdropBuilder.ts` y `StrategicCameraController.ts` con estética de papel envejecido *Marinequadratkarte Nr. 1546*, cuadrícula hueca `AD..CG` + `1..9` y LOD `11..99` al ampliar zoom.
+  - Implementados `StrategicIntelOverlayRenderer.ts`, `StrategicTopBarRenderer.ts`, `StrategicHudPrimitives.ts` y las dos cartelas flotantes inferiores (radiogramas BdU clicables que enfocan la cámara, conos hidrofónicos `±15°` y ocultación estricta fuera de `visibleContactIds`).
 - **Hito 2.3 — Geometría Real de Entrada al `15x15`, Persistencia Energética y Escape con Consecuencia (`src/layers/tactical/`, `src/layers/strategic/domain/`):**
   - Implementado `TacticalSpawnGeometry.ts` centrado en `(4, 7)`: el mercante entra `4 hex` aguas arriba en su rumbo estratégico real (`11` turnos garantizados en los `6` rumbos) y el U-Boot aparece a `4 hex` (`2000m`, emboscada en el mismo hex) o `6 hex` (`3000m`, intercepción adyacente) según `approachDirection`.
   - Propagados `timeOfDay` y `weather` a `TacticalStateSnapshot` / `TacticalHudRenderer` / `FiringSolutionContext`, emitido `TARGET_ESCAPED` al salir por el borde del tablero y persistidos `updatedFuel` (`0.1%`) y `updatedBattery` hacia `CampaignState`.
@@ -44,13 +48,12 @@
   - Nuevas suites de tests en `tests/layers/arcade-torpedo/` y prueba de ciclo completo de las 3 capas en `tests/flow/GameFlowController.test.ts` (**15 suites / 62 tests en verde**).
 
 ## En Progreso (Working On)
-- Iniciando **Hito 2.4 (Viewport `100vw x 100vh` HiDPI, Lámina Histórica `N.º 1546`, Cámara *Pan & Zoom* y HUD de Barra Superior + Cartelas)**.
+- Iniciando **Hito 2.5 (Retorno a Base Naval, *Kriegstagebuch* y Campaña Multi-Patrulla)**.
 
 ## Próximos Pasos (Backlog Inmediato)
-1. **Hito 2.4 — Viewport `100vw x 100vh` HiDPI, Lámina Histórica de Fondo y Cámara *Pan & Zoom*:** Carta histórica calibrada a `45x27` (y atenuada tras Táctico/Arcade `960x640`), rejilla hexagonal sutil y HUD de Barra Superior + Cartelas Flotantes con salto de cámara a radiogramas.
-2. **Hito 2.5 — Retorno a Base Naval, *Kriegstagebuch* y Campaña Multi-Patrulla:** Atraque en Brest/Lorient/Saint-Nazaire, informe de patrulla, rearme/reparación con avance de calendario y zarpe a nueva patrulla.
+1. **Hito 2.5 — Retorno a Base Naval, *Kriegstagebuch* y Campaña Multi-Patrulla:** `PatrolRefitRules.ts`, `KriegstagebuchModalRenderer.ts`, atraque en Brest/Lorient/Saint-Nazaire, rearme/reparación con avance de calendario (`14` días base + días por daños/torpedos) y zarpe a la Patrulla `N + 1`.
 
 ## Deuda Técnica y Decisiones Pendientes (Tech Debt)
-- Sin deuda técnica en la arquitectura actual (todos los archivos `.ts` `< 200` líneas, cero bucles anidados, 78 tests en verde).
+- Sin deuda técnica en la arquitectura actual (todos los archivos `.ts` `< 200` líneas, cero bucles anidados, 80 tests en verde).
 - **Limitaciones conocidas planificadas por fase (NO parchear fuera de su hito):**
   - En `PeriscopeKinematics.ts`, `distanceMeters` permanece fija y `normalizePeriscopeBroadsideAob` acota el ángulo inicial a `75°..105°` -> programado para sustituirse por **cinemática 2D real `(x, y)`** en la **Fase 3**.
