@@ -38,6 +38,8 @@ function createFiringContext(
     targetBowSide: 'STARBOARD',
     targetSpeedKnots: 10,
     hullIntegrityAtPeriscope: 100,
+    fuelAtPeriscope: 98,
+    batteryAtPeriscope: 90,
     ...overrides,
   };
 }

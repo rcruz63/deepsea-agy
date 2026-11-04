@@ -1,5 +1,6 @@
 import type {
   DifficultyConfig,
+  EncounterResult,
   FiringSolutionContext,
 } from '../../../core/contracts/index.ts';
 import {
@@ -9,6 +10,7 @@ import {
 import type { ShipRecognitionEntry } from './ShipRecognitionManual.ts';
 import type {
   TdcFiringInput,
+  TorpedoArcadeStateSnapshot,
   TorpedoShotOutcomeType,
   TorpedoShotResolution,
 } from './TorpedoTypes.ts';
@@ -140,5 +142,30 @@ export function resolveTorpedoShot(
     actualLengthMeters: actualTargetEntry.lengthMeters,
     actualSpeedKnots: firingContext.targetSpeedKnots,
     actualAobDeg: firingContext.targetAngleOnBowDeg,
+  };
+}
+
+export function buildArcadeEncounterResult(
+  snapshot: TorpedoArcadeStateSnapshot,
+  baseTacticalTurns: number,
+): EncounterResult {
+  const torpedoHits = snapshot.shotHistory.filter(
+    (shot) => shot.damageInflicted > 0,
+  ).length;
+  return {
+    contactId: snapshot.firingContext.contactId,
+    outcome: snapshot.isTargetSunk ? 'TARGET_SUNK' : 'DISENGAGED',
+    updatedArmory: snapshot.armory,
+    updatedFuel: snapshot.firingContext.fuelAtPeriscope,
+    updatedBattery: snapshot.firingContext.batteryAtPeriscope,
+    hullDamageTaken: 0,
+    isTargetSunk: snapshot.isTargetSunk,
+    sunkShipIds: snapshot.isTargetSunk ? [snapshot.firingContext.contactId] : [],
+    sunkTonnageAwarded: snapshot.isTargetSunk
+      ? snapshot.actualTargetEntry.tonnage
+      : 0,
+    torpedoesFiredInEncounter: snapshot.shotHistory.length,
+    torpedoHitsInEncounter: torpedoHits,
+    tacticalTurnsElapsed: baseTacticalTurns + snapshot.extraReloadTurnsElapsed,
   };
 }

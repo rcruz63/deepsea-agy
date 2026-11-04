@@ -1,12 +1,30 @@
 export type { DifficultyConfig, DifficultyLevel } from './DifficultyConfig.ts';
 export type {
+  HydrophoneSignalStrength,
+  PatrolClockState,
+  StrategicTimeScale,
+  TimeOfDay,
+  WatchHour,
+  WeatherState,
+} from './EnvironmentContracts.ts';
+export type {
+  BduPatrolOrder,
+  BduRadiogramReport,
+  HydrophoneBearingContact,
+  KriegstagebuchPatrolSummary,
+  PatrolStatus,
+} from './StrategicIntelContracts.ts';
+export type {
   TorpedoArmoryState,
   TorpedoTubeMount,
   TorpedoTubeState,
   TorpedoTubeStatus,
 } from './TorpedoArmoryState.ts';
 export type {
+  AlliedPortDefinition,
+  CommercialRouteCorridor,
   HexTerrainType,
+  MarineQuadratGridSpec,
   NavalBaseDefinition,
   SubmarineSpec,
   SurfaceShipSpec,

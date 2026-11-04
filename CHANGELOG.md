@@ -8,6 +8,9 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
 ## [Unreleased]
 
 ### Added
+- **Hito 2.0 — Congelación de Contratos Globales de Fase 2 (`src/core/contracts/`):**
+  - Nuevos módulos `EnvironmentContracts.ts` y `StrategicIntelContracts.ts` para reloj de guardia de `4h`, meteorología, conos de hidrófono, órdenes/radiogramas del BdU y resumen *Kriegstagebuch*.
+  - Ampliados `TheaterDefinition`, `CampaignState`, `EncounterContext`, `FiringSolutionContext` y `EncounterResult` con soporte `ships[]`, puertos aliados bloqueados (`ALLIED_PORT`), corredores comerciales, geometría de intercepción real, persistencia de `fuel`/`battery` y desenlace `TARGET_ESCAPED`.
 - **Especificación Cerrada de Fase 2, Roadmap Antiprevisibilidad e `IDEAS_BACKLOG.md` (`docs/`):**
   - Creado `docs/phases/PHASE_02_STRATEGIC_CAMPAIGN.md` con los 5 hitos atómicos (Hitos 2.1 a 2.5) y las reglas matemáticas cerradas del Teatro Atlántico `45x27` (*Marinequadrat* `5x3` de `9x9` con códigos `11..99`), doble escala `24H / 4H` con `6` sub-ticks e interrupción automática, consumo diésel decimal (`0.1%`), niebla de guerra estratégica (visual por luz/clima, hidrófono por cono `±15°` y radiogramas BdU diferidos en inmersión), corredores aliados con desvío `±1 hex`, contratos `ships[]` + geometría real de entrada/escape al `15x15`, carta histórica `100vw x 100vh` HiDPI y retorno multi-patrulla (*Kriegstagebuch*).
   - Creado `docs/IDEAS_BACKLOG.md` con protocolo *Phase Gate* anti-implementación autónoma y matriz de hitos opcionales por fase (`3.OPT` Cañón de `88mm` + *Q-Ships* en Fase 3; `5.OPT-A/B/C` *Flak* vs. avión, Vacas Lecheras Tipo XIV e infiltración en puertos aliados en Fase 5; `6.OPT` tecnología `1939–1945` y veteranía de tripulación en Fase 6), además de las cartas históricas de referencia (`docs/mapa_1.jpg`, `docs/mapa_2.jpg`, `docs/mapa3.jpg`).

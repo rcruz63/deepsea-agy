@@ -108,7 +108,7 @@ export const ATLANTIC_MERCHANT_ROUTES: Readonly<
 };
 
 export function isNavigableStrategicTerrain(terrain: HexTerrainType): boolean {
-  return terrain !== 'LAND';
+  return terrain !== 'LAND' && terrain !== 'ALLIED_PORT';
 }
 
 function resolveAtlanticCellTerrain(coordinate: AxialCoordinate): StrategicMapCell {
@@ -140,6 +140,16 @@ export function createInitialAtlanticCampaignState(
   return {
     theaterId: ATLANTIC_SECTOR_THEATER.theaterId,
     turnNumber: 1,
+    timeScale: 'PATROL_4H',
+    clock: {
+      patrolNumber: 1,
+      campaignDay: 1,
+      hourOfDay: 8,
+      timeOfDay: 'DAWN',
+    },
+    weather: 'CLEAR',
+    weatherTurnsRemaining: 4,
+    patrolStatus: 'ACTIVE',
     difficulty,
     submarine: {
       specId: submarineSpec.specId,
@@ -165,6 +175,16 @@ export function createInitialAtlanticCampaignState(
         isSunk: false,
       },
     ],
+    visibleContactIds: ['merchant_alpha'],
+    hydrophoneContacts: [],
+    activePatrolOrder: null,
+    deliveredRadiograms: [],
+    queuedSubmergedRadiograms: [],
+    patrolTorpedoesFired: 0,
+    patrolTorpedoHits: 0,
+    patrolSunkShipsCount: 0,
+    patrolSunkTonnage: 0,
     totalSunkTonnage: 0,
+    lastPatrolSummary: null,
   };
 }

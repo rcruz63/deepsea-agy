@@ -66,6 +66,8 @@ function resolveTerrainFillStyle(cell: StrategicMapCell): string {
   switch (cell.terrain) {
     case 'LAND':
       return '#1d2b24';
+    case 'ALLIED_PORT':
+      return '#3a1d22';
     case 'NAVAL_BASE':
       return '#13382e';
     case 'COASTAL_WATER':

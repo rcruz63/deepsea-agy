@@ -1,9 +1,13 @@
 # ESTADO DEL PROYECTO (HANDOFF & TRACKING)
 
 ## Estado Actual (Resumen Ejecutivo)
-La **Fase 1: Vertical Slice** está **100% completada y verificada** (`tsc --noEmit`, `vite build` y 15 suites / 62 tests en Vitest), y el **Diseño Funcional y Arquitectónico de la Fase 2 (`docs/phases/PHASE_02_STRATEGIC_CAMPAIGN.md`)** acaba de quedar **100% cerrado y consensuado** junto con el reparto antiprevisibilidad entre Fase 2 y Fase 3 en `docs/GAME_DESIGN_VISION.md` y el archivo gobernado de ideas futuras `docs/IDEAS_BACKLOG.md`. El proyecto está listo para iniciar la implementación del **Hito 2.1**.
+**Fase 2 en ejecución — Hito 2.0 (Congelación de Contratos en `src/core/contracts/`) completado y verificado** (`tsc --noEmit` limpio y 15 suites / 62 tests en verde, todos los archivos `< 200` líneas). Todas las interfaces de transición e inteligencia de la Fase 2 están congeladas y listas para implementar el **Hito 2.1**.
 
 ## Completado Recientemente
+- **Hito 2.0 — Congelación de Contratos de Fase 2 (`src/core/contracts/`):**
+  - Creados `EnvironmentContracts.ts` (`StrategicTimeScale`, `PatrolClockState`, `TimeOfDay`, `WeatherState`) y `StrategicIntelContracts.ts` (`HydrophoneBearingContact`, `BduPatrolOrder`, `BduRadiogramReport`, `KriegstagebuchPatrolSummary`, `PatrolStatus`).
+  - Ampliados `TheaterDefinition.ts` (`ALLIED_PORT`, `AlliedPortDefinition`, `CommercialRouteCorridor`, `MarineQuadratGridSpec`, `chartAssetUrl`), `CampaignState.ts` (niebla de guerra, cola de radiogramas en inmersión, reloj/clima y métricas de patrulla) y `EncounterContracts.ts` (`ships[]`, geometría de intercepción, `fuelAtPeriscope`/`batteryAtPeriscope`, `updatedFuel`/`updatedBattery`, `sunkShipIds`, `TARGET_ESCAPED` y telemetría de torpedos).
+  - Extraídos los constructores puros `buildTacticalEncounterResult` y `buildArcadeEncounterResult` para mantener `HexTacticalEngine.ts` (`194` líneas) y `TorpedoArcadeEngine.ts` (`197` líneas) por debajo del límite de 200 líneas.
 - **Especificación Cerrada de Fase 2, Reparto Fase 2 vs. Fase 3 e `IDEAS_BACKLOG.md` (`docs/`):**
   - Actualizado `docs/GAME_DESIGN_VISION.md` y `docs/GAME_DESIGN.md` (§4.2) fijando la frontera antiprevisibilidad en `EncounterContext`: Fase 2 absorbe niebla estratégica total, hidrófono por cono de demora, radiogramas BdU diferidos, luz/clima, corredores con desvío `±1 hex` y geometría real de entrada/escape al `15x15` (dejando `ships[]` preparado); Fase 3 agrupa convoyes multi-barco y escoltas destacables, niebla acústica en `DEEP`, detección en `SURFACED`/periscopio, IA reactiva/zigzag, `DEMS` y cinemática 2D real `(x, y)` en el Periscopio Arcade (fin del tiempo infinito de apuntado).
   - Creado `docs/phases/PHASE_02_STRATEGIC_CAMPAIGN.md` con las reglas matemáticas cerradas (`45x27` *odd-r* en `5x3` cuadrantes *Marinequadrat* `9x9` con numeración `11..99`, doble escala `24H / 4H` con `6` sub-ticks e interrupción *auto-drop*, consumo decimal `0.1%`, viewport `100vw x 100vh` HiDPI con lámina histórica calibrada de fondo y campaña multi-patrulla con *Kriegstagebuch*) divididas en los Hitos 2.1 a 2.5.
@@ -28,7 +32,7 @@ La **Fase 1: Vertical Slice** está **100% completada y verificada** (`tsc --noE
   - Nuevas suites de tests en `tests/layers/arcade-torpedo/` y prueba de ciclo completo de las 3 capas en `tests/flow/GameFlowController.test.ts` (**15 suites / 62 tests en verde**).
 
 ## En Progreso (Working On)
-- Ninguna tarea de código en curso. Documentación de Fase 2 cerrada y lista para comenzar el **Hito 2.1**.
+- Iniciando **Hito 2.1 (`MarineQuadratMapper`, Teatro Atlántico `45x27`, Corredores Aliados `±1 hex` y Escala `24H / 4H`)**.
 
 ## Próximos Pasos (Backlog Inmediato)
 1. **Hito 2.1 — `MarineQuadratMapper`, Teatro Atlántico `45x27`, Corredores Aliados (`±1 hex`) y Escala `24H / 4H`:** Traductor `O(1)` de cuadrantes `AD..CG` (`11..99`), escenario `45x27` con bases del Eje y puertos aliados cerrados, escala `24H` (`6` sub-ticks de `4h` + *auto-drop*), consumo decimal (`0.1%`) y `ABORTED_AT_SEA`.

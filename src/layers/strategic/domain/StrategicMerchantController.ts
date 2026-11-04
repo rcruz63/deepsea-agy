@@ -88,14 +88,30 @@ export function buildStrategicEncounterContext(
   targetContact: StrategicContactState,
 ): EncounterContext {
   const shipSpec = resolveSurfaceShipSpec(theater, targetContact.shipSpecId);
+  const rawDistance = calculateHexDistance(
+    campaignState.submarine.coordinate,
+    targetContact.coordinate,
+  );
+  const interceptionDistanceHexes: 0 | 1 = rawDistance === 0 ? 0 : 1;
+  const approachDirection = resolveAdjacentHexDirection(
+    targetContact.coordinate,
+    campaignState.submarine.coordinate,
+    campaignState.submarine.heading,
+  );
+  const primarySnapshot = {
+    contactId: targetContact.contactId,
+    spec: shipSpec,
+    heading: targetContact.heading,
+    speedKnots: shipSpec.cruiseSpeedKnots,
+  };
   return {
     submarine: campaignState.submarine,
     difficulty: campaignState.difficulty,
-    targetShip: {
-      contactId: targetContact.contactId,
-      spec: shipSpec,
-      heading: targetContact.heading,
-      speedKnots: shipSpec.cruiseSpeedKnots,
-    },
+    ships: [primarySnapshot],
+    targetShip: primarySnapshot,
+    timeOfDay: campaignState.clock.timeOfDay,
+    weather: campaignState.weather,
+    interceptionDistanceHexes,
+    approachDirection,
   };
 }

@@ -94,13 +94,15 @@ flowchart TD
 | Contrato | Responsabilidad en la Arquitectura |
 | :--- | :--- |
 | `DifficultyConfig` | Parametriza reserva infinita/finita, turnos de recarga, penalización acústica, tolerancia de espoleta, probabilidad de *dud* e incertidumbre estratégica. |
+| `EnvironmentContracts` | Tipa la escala temporal (`PATROL_4H` / `TRANSIT_24H`), el reloj de guardia (`PatrolClockState`), luz (`TimeOfDay`) y meteorología (`WeatherState`). |
+| `StrategicIntelContracts` | Aísla la inteligencia bajo niebla de guerra (`HydrophoneBearingContact`, `BduPatrolOrder`, `BduRadiogramReport` y `KriegstagebuchPatrolSummary`). |
 | `TorpedoArmoryState` | Modela individualmente `bowTubes`, `sternTubes` y `reserveTorpedoes`. Cada tubo gestiona su estado (`LOADED`, `RELOADING`, `EMPTY`, `DAMAGED`), turnos restantes y pausa silenciosa (`isReloadPaused`). |
-| `TheaterDefinition` | Define de forma declarativa el teatro de operaciones, dimensiones del mapa, bases navales y catálogos `SubmarineSpec` y `SurfaceShipSpec`. |
+| `TheaterDefinition` | Define declarativamente dimensiones, bases propias, puertos aliados bloqueados (`ALLIED_PORT`), corredores comerciales con deriva, rejilla *Marinequadrat* y catálogos. |
 | `SubmarineState` | Posición axial, rumbo, postura (`SURFACED` / `SUBMERGED`), cota, combustible, baterías, integridad del casco y `TorpedoArmoryState`. |
-| `CampaignState` | Estado raíz de la patrulla activa: teatro cargado, turno global, dificultad, estado del submarino, contactos móviles y tonelaje hundido. |
-| `EncounterContext` | Fotografía inmutable enviada desde `StrategicLayer` hacia `ITacticalStage` al interceptar un contacto. |
-| `FiringSolutionContext` | Fotografía geométrica (distancia relativa real, AOB real, banda `PORT`/`STARBOARD`, velocidad real, buque objetivo y armería) enviada hacia `ArcadeLayer` al subir el periscopio. |
-| `EncounterResult` | Resultado inmutable devuelto a `StrategicLayer` (armería actualizada, daño sufrido, hundimiento del blanco, tonelaje y tiempo consumido). |
+| `CampaignState` | Estado raíz de la patrulla activa: escala, reloj, clima, submarino, contactos, IDs visibles, conos de hidrófono, cola de radiogramas BdU y resumen de patrulla. |
+| `EncounterContext` | Fotografía inmutable enviada hacia `ITacticalStage`: lista `ships[]`, luz/clima, distancia (`0`/`1`) y dirección axial real de aproximación. |
+| `FiringSolutionContext` | Fotografía geométrica, ambiental y energética (`fuelAtPeriscope`, `batteryAtPeriscope`) enviada hacia `ArcadeLayer` al subir el periscopio. |
+| `EncounterResult` | Resultado inmutable devuelto a `StrategicLayer` (armería, `updatedFuel`, `updatedBattery`, daño, `sunkShipIds`, escape `TARGET_ESCAPED`, disparos/aciertos y turnos). |
 | `ITacticalStage` | Contrato polimórfico que aísla la implementación del tablero táctico (hexagonal 15x15 vs. futuro ploteo polar por anillos). |
 
 ---

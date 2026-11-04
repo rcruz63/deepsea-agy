@@ -17,15 +17,21 @@ function createTestEncounterContext(): EncounterContext {
   const campaign = createInitialAtlanticCampaignState(
     getDifficultyConfig('NORMAL'),
   );
+  const shipSnapshot = {
+    contactId: 'merchant_alpha',
+    spec: ATLANTIC_SECTOR_THEATER.surfaceShipCatalog[0]!,
+    heading: 0 as const,
+    speedKnots: 10,
+  };
   return {
     submarine: campaign.submarine,
     difficulty: campaign.difficulty,
-    targetShip: {
-      contactId: 'merchant_alpha',
-      spec: ATLANTIC_SECTOR_THEATER.surfaceShipCatalog[0]!,
-      heading: 0,
-      speedKnots: 10,
-    },
+    ships: [shipSnapshot],
+    targetShip: shipSnapshot,
+    timeOfDay: 'DAY',
+    weather: 'CLEAR',
+    interceptionDistanceHexes: 1,
+    approachDirection: 1,
   };
 }
 

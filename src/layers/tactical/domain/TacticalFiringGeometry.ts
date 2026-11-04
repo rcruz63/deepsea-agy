@@ -1,5 +1,7 @@
 import type {
   DifficultyConfig,
+  EncounterOutcomeReason,
+  EncounterResult,
   FiringSolutionContext,
   TargetBowSide,
   TorpedoArmoryState,
@@ -138,6 +140,30 @@ export function buildTacticalFiringSolutionContext(
     targetBowSide: telemetry.targetBowSide,
     targetSpeedKnots: merchant.speedKnots,
     hullIntegrityAtPeriscope: submarine.hullIntegrity,
+    fuelAtPeriscope: submarine.fuel,
+    batteryAtPeriscope: submarine.battery,
     submarineRelativeBearingDeg,
+  };
+}
+
+export function buildTacticalEncounterResult(
+  submarine: TacticalSubmarineSnapshot,
+  merchant: TacticalMerchantSnapshot,
+  outcome: EncounterOutcomeReason,
+  tacticalTurnsElapsed: number,
+): EncounterResult {
+  return {
+    contactId: merchant.contactId,
+    outcome,
+    updatedArmory: submarine.armory,
+    updatedFuel: submarine.fuel,
+    updatedBattery: submarine.battery,
+    hullDamageTaken: 0,
+    isTargetSunk: false,
+    sunkShipIds: [],
+    sunkTonnageAwarded: 0,
+    torpedoesFiredInEncounter: 0,
+    torpedoHitsInEncounter: 0,
+    tacticalTurnsElapsed,
   };
 }

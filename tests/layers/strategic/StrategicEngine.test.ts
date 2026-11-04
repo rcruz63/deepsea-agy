@@ -72,9 +72,14 @@ describe('StrategicEngine', () => {
       contactId: 'merchant_alpha',
       outcome: 'TARGET_SUNK',
       updatedArmory: armoryAfterShot,
+      updatedFuel: 95,
+      updatedBattery: 85,
       hullDamageTaken: 10,
       isTargetSunk: true,
+      sunkShipIds: ['merchant_alpha'],
       sunkTonnageAwarded: 7100,
+      torpedoesFiredInEncounter: 1,
+      torpedoHitsInEncounter: 1,
       tacticalTurnsElapsed: 4,
     });
 

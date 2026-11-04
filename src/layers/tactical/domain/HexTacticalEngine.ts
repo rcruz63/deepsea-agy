@@ -15,6 +15,7 @@ import {
   areAxialCoordinatesEqual,
 } from '../../../core/hex/index.ts';
 import {
+  buildTacticalEncounterResult,
   buildTacticalFiringSolutionContext,
   evaluateTacticalFiringTelemetry,
 } from './TacticalFiringGeometry.ts';
@@ -176,15 +177,12 @@ export class HexTacticalEngine
 
   private buildDisengagedResult(): EncounterResult {
     const { submarine, merchant } = this.assertInitialized();
-    return {
-      contactId: merchant.contactId,
-      outcome: 'DISENGAGED',
-      updatedArmory: submarine.armory,
-      hullDamageTaken: 0,
-      isTargetSunk: false,
-      sunkTonnageAwarded: 0,
-      tacticalTurnsElapsed: this.turnNumber - 1,
-    };
+    return buildTacticalEncounterResult(
+      submarine,
+      merchant,
+      'DISENGAGED',
+      this.turnNumber - 1,
+    );
   }
 
   private assertInitialized() {

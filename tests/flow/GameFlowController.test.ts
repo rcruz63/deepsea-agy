@@ -50,9 +50,14 @@ describe('GameFlowController', () => {
       contactId: 'merchant_alpha',
       outcome: 'TARGET_SUNK',
       updatedArmory,
+      updatedFuel: 96,
+      updatedBattery: 88,
       hullDamageTaken: 0,
       isTargetSunk: true,
+      sunkShipIds: ['merchant_alpha'],
       sunkTonnageAwarded: 7100,
+      torpedoesFiredInEncounter: 1,
+      torpedoHitsInEncounter: 1,
       tacticalTurnsElapsed: 3,
     });
 

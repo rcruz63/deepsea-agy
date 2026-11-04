@@ -2,7 +2,7 @@ import { advanceArmoryReloadTurn, canStartTorpedoReloadInArmory, findTorpedoTube
 import type { EncounterResult, FiringSolutionContext, TorpedoArmoryState } from '../../../core/contracts/index.ts';
 import { MAX_TORPEDO_DEPTH_METERS, MIN_TORPEDO_DEPTH_METERS, advanceTargetHorizonBearing, calculateLeadAngleOffsetDeg, calculateSignedAngularDeltaDeg, calculateTorpedoRunTimings, clampPeriscopeBearing, findPreferredLoadedTubeForArc, isTubeCompatibleWithArc, mergeAndClampTdcInput, normalizePeriscopeBroadsideAob, normalizeRelativeBearingDeg, resolveActiveFiringArc, stepActiveTorpedoRun } from './PeriscopeKinematics.ts';
 import { type ShipRecognitionEntry, getShipRecognitionEntry, resolveActualShipRecognitionEntry } from './ShipRecognitionManual.ts';
-import { resolveTorpedoShot } from './TorpedoResolutionEngine.ts';
+import { buildArcadeEncounterResult, resolveTorpedoShot } from './TorpedoResolutionEngine.ts';
 import type { ActiveTorpedoRunState, TdcFiringInput, TorpedoArcadeStateSnapshot, TorpedoShotResolution } from './TorpedoTypes.ts';
 
 // Coordina el ataque en periscopio de 360°: arcos de proa/popa, timón del submarino, carrera del torpedo y retorno
@@ -185,9 +185,7 @@ export class TorpedoArcadeEngine {
   }
 
   public buildEncounterResult(baseTacticalTurns = 1): EncounterResult {
-    const s = this.getSnapshot();
-    const outcome = s.isTargetSunk ? 'TARGET_SUNK' : 'DISENGAGED';
-    return { contactId: s.firingContext.contactId, outcome, updatedArmory: s.armory, hullDamageTaken: 0, isTargetSunk: s.isTargetSunk, sunkTonnageAwarded: s.isTargetSunk ? s.actualTargetEntry.tonnage : 0, tacticalTurnsElapsed: baseTacticalTurns + this.extraReloadTurnsElapsed };
+    return buildArcadeEncounterResult(this.getSnapshot(), baseTacticalTurns);
   }
 
   private assertInitialized() {
