@@ -1,9 +1,13 @@
 # ESTADO DEL PROYECTO (HANDOFF & TRACKING)
 
 ## Estado Actual (Resumen Ejecutivo)
-La **Fase 1: Vertical Slice (Navegación, Aproximación y Disparo de Torpedo)** está **100% completada y verificada** (Hitos 1.1, 1.2, 1.3 y 1.4 cerrados; `tsc --noEmit`, `vite build` y 15 suites / 62 tests unitarios y de integración pasando en Vitest). El ciclo completo de las 3 capas (`StrategicLayer -> TacticalLayer -> ArcadeLayer -> StrategicLayer`) funciona de extremo a extremo a través de `GameFlowController` sin ninguna importación cruzada entre capas y con todos los archivos del repositorio por debajo del límite estricto de 200 líneas y cero bucles anidados. El proyecto está listo para iniciar la **Fase 2: Campaña Estratégica, Sensores e Inteligencia**.
+La **Fase 1: Vertical Slice** está **100% completada y verificada** (`tsc --noEmit`, `vite build` y 15 suites / 62 tests en Vitest), y el **Diseño Funcional y Arquitectónico de la Fase 2 (`docs/phases/PHASE_02_STRATEGIC_CAMPAIGN.md`)** acaba de quedar **100% cerrado y consensuado** junto con el reparto antiprevisibilidad entre Fase 2 y Fase 3 en `docs/GAME_DESIGN_VISION.md` y el archivo gobernado de ideas futuras `docs/IDEAS_BACKLOG.md`. El proyecto está listo para iniciar la implementación del **Hito 2.1**.
 
 ## Completado Recientemente
+- **Especificación Cerrada de Fase 2, Reparto Fase 2 vs. Fase 3 e `IDEAS_BACKLOG.md` (`docs/`):**
+  - Actualizado `docs/GAME_DESIGN_VISION.md` y `docs/GAME_DESIGN.md` (§4.2) fijando la frontera antiprevisibilidad en `EncounterContext`: Fase 2 absorbe niebla estratégica total, hidrófono por cono de demora, radiogramas BdU diferidos, luz/clima, corredores con desvío `±1 hex` y geometría real de entrada/escape al `15x15` (dejando `ships[]` preparado); Fase 3 agrupa convoyes multi-barco y escoltas destacables, niebla acústica en `DEEP`, detección en `SURFACED`/periscopio, IA reactiva/zigzag, `DEMS` y cinemática 2D real `(x, y)` en el Periscopio Arcade (fin del tiempo infinito de apuntado).
+  - Creado `docs/phases/PHASE_02_STRATEGIC_CAMPAIGN.md` con las reglas matemáticas cerradas (`45x27` *odd-r* en `5x3` cuadrantes *Marinequadrat* `9x9` con numeración `11..99`, doble escala `24H / 4H` con `6` sub-ticks e interrupción *auto-drop*, consumo decimal `0.1%`, viewport `100vw x 100vh` HiDPI con lámina histórica calibrada de fondo y campaña multi-patrulla con *Kriegstagebuch*) divididas en los Hitos 2.1 a 2.5.
+  - Creado `docs/IDEAS_BACKLOG.md` con protocolo de *Phase Gate* (prohibida la auto-implementación; evaluables bajo consulta explícita al usuario al cerrar la fase donde ya existen sus dependencias: `3.OPT` Cañón `88mm` + *Q-Ships* en Fase 3; `5.OPT-A/B/C` Duelo *Flak*, Vacas Lecheras Tipo XIV e Infiltración Portuaria en Fase 5; `6.OPT` Tecnología `1939–1945` y Tripulación en Fase 6).
 - **Periscopio de 360°, Arcos Reales de Fuego Proa/Popa (`BOW` / `STERN` / `DEAD_ZONE`), Marcación Relativa Táctica y Timón del Submarino:**
   - Ampliado `FiringSolutionContext` con `submarineRelativeBearingDeg` (`[-180°, +180°)`) calculado en `TacticalFiringGeometry.ts` a partir del rumbo real del submarino en el mapa `15x15`, de modo que el blanco no aparece siempre centrado en `0°` sino en su marcación relativa real (proa, través en zona muerta o popa).
   - Óptica de periscopio circular de `360°` (`normalizeRelativeBearingDeg`, `calculateSignedAngularDeltaDeg`, `resolveActiveFiringArc` en `PeriscopeKinematics.ts`) sin teletransporte al cruzar el horizonte, con tres sectores codificados por color: **Arco de Proa (`BOW`, `-45°..+45°`, verde)** que habilita exclusivamente `BOW-1..4`, **Arco de Popa (`STERN`, `±135°..180°`, cian)** que habilita exclusivamente `STERN-1`, y **Zonas Muertas de Través (`DEAD_ZONE`, rojo)** donde el disparo queda bloqueado por límite de giroscopio.
@@ -24,13 +28,17 @@ La **Fase 1: Vertical Slice (Navegación, Aproximación y Disparo de Torpedo)** 
   - Nuevas suites de tests en `tests/layers/arcade-torpedo/` y prueba de ciclo completo de las 3 capas en `tests/flow/GameFlowController.test.ts` (**15 suites / 62 tests en verde**).
 
 ## En Progreso (Working On)
-- Ninguna tarea en curso. **Fase 1 finalizada al 100%**.
+- Ninguna tarea de código en curso. Documentación de Fase 2 cerrada y lista para comenzar el **Hito 2.1**.
 
-## Próximos Pasos (Backlog Inmediato — Fase 2: Campaña Estratégica, Sensores e Inteligencia)
-1. **Hito 2.1 — Sistema Cartográfico *Marinequadrat* (`MarineQuadratMapper`) y Doble Escala Temporal (`24h` / `4h`):** Implementar en `src/core/hex/` o `src/layers/strategic/domain/` el traductor de coordenadas axiales `(q, r)` a nomenclatura naval alemana (`AL 44`, `AK 63`, sub-cuadrícula `1..9`) y la alternancia entre modo Tránsito Oceánico (`24h/turno`) y Patrulla Operativa (`4h/turno`).
-2. **Hito 2.2 — Cámara Pan & Zoom a Pantalla Completa (`100vw x 100vh`) y Carta Náutica Histórica:** Rediseñar la vista de la Capa Estratégica para ocupar todo el viewport con estética de carta en papel de la *Kriegsmarine*, puertos históricos, rutas de convoyes discontinuas y barra de mando superior superpuesta.
-3. **Hito 2.3 — Radiogramas del Bdu, Niebla de Guerra y Conos de Detección:** Incorporar incertidumbre de contactos según `DifficultyConfig.strategicContactUncertaintyHexes` y detección dependiente de meteorología, hora del día y postura (`SURFACED` vs `SUBMERGED`).
-4. **Hito 2.4 — Retorno a Base Naval (Brest / Saint-Nazaire):** Implementar reabastecimiento de combustible (`fuel = 100`), torpedos (`reserveTorpedoes`), reparación de casco y resumen de patrulla.
+## Próximos Pasos (Backlog Inmediato)
+1. **Hito 2.1 — `MarineQuadratMapper`, Teatro Atlántico `45x27`, Corredores Aliados (`±1 hex`) y Escala `24H / 4H`:** Traductor `O(1)` de cuadrantes `AD..CG` (`11..99`), escenario `45x27` con bases del Eje y puertos aliados cerrados, escala `24H` (`6` sub-ticks de `4h` + *auto-drop*), consumo decimal (`0.1%`) y `ABORTED_AT_SEA`.
+2. **Hito 2.2 — Niebla de Guerra, Ciclo Luz/Clima, Hidrófono por Cono (`±15°`) y Radiogramas BdU Diferidos:** Ocultación de contactos fuera de radio visual (`0..2 hex`), escucha sumergida `3..5 hex` por demora/intensidad y cola de radiogramas entregada al emerger.
+3. **Hito 2.3 — Contratos `ships[]`, Geometría Real de Entrada al `15x15` y Escape con Consecuencia:** Actualizar `EncounterContext`/`EncounterResult` (`updatedFuel`, `updatedBattery`, `timeOfDay`, `weather`, `TARGET_ESCAPED`), spawn relativo según ángulo de intercepción y avance `+1 hex` del contacto escapado.
+4. **Hito 2.4 — Viewport `100vw x 100vh` HiDPI, Lámina Histórica de Fondo y Cámara *Pan & Zoom*:** Carta histórica calibrada a `45x27` (y atenuada tras Táctico/Arcade `960x640`), rejilla hexagonal sutil y HUD de Barra Superior + Cartelas Flotantes con salto de cámara a radiogramas.
+5. **Hito 2.5 — Retorno a Base Naval, *Kriegstagebuch* y Campaña Multi-Patrulla:** Atraque en Brest/Lorient/Saint-Nazaire, informe de patrulla, rearme/reparación con avance de calendario y zarpe a nueva patrulla.
 
 ## Deuda Técnica y Decisiones Pendientes (Tech Debt)
-- Sin deuda técnica activa: `EncounterStubView.ts` ha sido eliminado y sustituido por `TorpedoArcadeStageView`, no existen importaciones cruzadas entre `src/layers/strategic/`, `src/layers/tactical/` y `src/layers/arcade-torpedo/`, y los 62 archivos `.ts` cumplen estrictamente `< 200` líneas y cero bucles anidados.
+- Sin deuda técnica en la arquitectura actual (62 archivos `.ts` `< 200` líneas, cero bucles anidados, 62 tests en verde).
+- **Limitaciones conocidas planificadas por fase (NO parchear fuera de su hito):**
+  - `EncounterResult` aún no persiste `fuel`/`battery` tácticos ni distancia al contacto escapado -> se resuelve en **Hito 2.3**.
+  - En `PeriscopeKinematics.ts`, `distanceMeters` permanece fija y `normalizePeriscopeBroadsideAob` acota el ángulo inicial a `75°..105°` -> programado para sustituirse por **cinemática 2D real `(x, y)`** en la **Fase 3**.

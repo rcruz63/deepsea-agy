@@ -55,9 +55,11 @@ flowchart TD
 │   ├── ARCHITECTURE.md                   # Mapa modular, contratos y diagramas de flujo
 │   ├── GAME_DESIGN.md                    # Fórmulas matemáticas y reglas mecánicas cerradas
 │   ├── GAME_DESIGN_VISION.md             # Visión general y roadmap de las 6 fases
+│   ├── IDEAS_BACKLOG.md                  # Ideas exploratorias aparcadas (prohibido auto-implementar)
 │   ├── STATUS.md                         # Estado vivo del proyecto para handoff inmediato
 │   └── phases/
-│       └── PHASE_01_VERTICAL_SLICE.md    # Especificación funcional de la Fase 1
+│       ├── PHASE_01_VERTICAL_SLICE.md    # Especificación funcional de la Fase 1 (cerrada)
+│       └── PHASE_02_STRATEGIC_CAMPAIGN.md # Especificación funcional y matemática de la Fase 2
 ├── src/
 │   ├── core/                             # Lógica de dominio pura compartida (Hito 1.1 completado)
 │   │   ├── contracts/                    # Contratos inmutables e interfaces de transición

@@ -64,10 +64,11 @@ Recursos `fuel` y `battery` acotados en `[0, 100]`. La costa (`LAND`) es intrans
 - **Recarga de torpedos en 4h:** Un turno estratégico completa todos los ticks de recarga de los tubos en `RELOADING` no pausados.
 - **Intercepción (`EncounterContext`):** Habilitada cuando `calculateHexDistance(sub, merchant) <= 1`.
 
-### 4.2. Especificación de Evolución Estratégica para Fase 2 (Cerrada en Diseño)
-1. **Viewport Completo (`100vw x 100vh`) y HUD Superior:** Lienzo a pantalla completa con cámara *pan & zoom*, barra de mando superior y cartelas flotantes sobre la carta.
-2. **Estética Cartográfica y *Marinequadrat* (`NavalGridSystem`):** Estilo en papel de la *Kriegsmarine* con puertos históricos (Brest, Saint-Nazaire, Halifax, Liverpool, Gibraltar) y `MarineQuadratMapper` para traducir `(q, r)` a nomenclatura naval alemana (`AD`, `AE`, `AK`, `AL`, `AM`, `BE`, `BF` + subcuadrante `11..99`, ej. `AL 44`, `AK 63`).
-3. **Doble Zoom y Consumo Variable:** Zoom 1 (*Carta Oceánica / Tránsito*, turnos de `24h` con tabla de consumo de crucero oceánico) y Zoom 2 (*Carta de Sector / Patrulla*, turnos de `4h` con tabla operacional e hidrófono).
+### 4.2. Especificación Cerrada de Fase 2 (Ver Detalle en `docs/phases/PHASE_02_STRATEGIC_CAMPAIGN.md`)
+1. **Matriz *Marinequadrat* `45x27` (`5x3` Cuadrantes de `9x9`):** Proyección ortogonal *odd-r* (`col = q + floor(r / 2)`, `row = r`) con numeración histórica `O(1)` (`AD..CG` + subsector `1..9` + celda `11..99`, ej. `AL 44`), bases del Eje (`Brest`, `Lorient`, `Saint-Nazaire`), puertos aliados cerrados por redes/minas (`Halifax`, `Liverpool`, `Gibraltar`) y corredores comerciales con deriva lateral `±1 hex`.
+2. **Doble Escala (`TRÁNSITO 24H` / `PATRULLA 4H`) y Consumo Decimal (`0.1%`):** Selector explícito donde `24H` (`SURFACED`, `1..5 hex` económico u `6..8 hex` forzado) ejecuta `6` ticks internos de `4h` con interrupción automática (*auto-drop*) ante contactos o radiogramas cercanos. Consumo base: `-0.4%` espera, `-0.9%/hex` económico (~111 hex de autonomía), `-2.8%/4h` forzar máquinas (`2 hex`), y cierre `ABORTED_AT_SEA` si `fuel` y `battery` se agotan en alta mar.
+3. **Niebla de Guerra Total, Sensores, Luz y Clima:** Radio visual en `SURFACED` de `0..2 hex` según `TimeOfDay` y `WeatherState`; Hidrófono en `SUBMERGED` (`5 hex` parado / `3 hex` en marcha, `-1` en `STORM`) devolviendo cono de demora `±15°` e intensidad sin casilla exacta; Radiogramas del BdU con radio de incertidumbre `1..3 hex` retenidos en cola mientras se navega sumergido.
+4. **Geometría Real de Entrada/Escape (`EncounterContext` / `EncounterResult`) y *Kriegstagebuch*:** Contrato preparado con `ships[]`, `updatedFuel`, `updatedBattery`, `timeOfDay`, `weather`, rumbo real del mercante a través de `(7,7)` y spawn relativo del submarino (`dist 0` emboscada `4-5 hex` vs. `dist 1` sector real a `6 hex`), distanciando `+1 hex` al contacto si escapa del `15x15`. Viewport `100vw x 100vh` HiDPI con lámina histórica calibrada de fondo (y atenuada tras Táctico/Arcade `960x640`) e Informe de Patrulla multi-salida al atracar.
 
 ---
 
