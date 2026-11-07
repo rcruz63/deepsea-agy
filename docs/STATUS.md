@@ -4,6 +4,8 @@
 **Fase 2 (Campaña Estratégica — Atlántico Norte `45x27` *Marinequadrat*) COMPLETADA al 100% — Hitos 2.0 a 2.5 cerrados y verificados** (`tsc --noEmit` limpio, `vite build` limpio y **21 suites / 82 tests en verde**, todos los archivos `.ts` `< 200` líneas, cero bucles anidados y aislamiento estricto entre las 3 capas). Proyecto listo para iniciar el diseño e implementación de la **Fase 3 (Convoyes Multi-Barco, Escoltas, IA Reactiva y Sonar/ASDIC)**.
 
 ## Completado Recientemente
+- **Configuración Declarativa de Despliegue en Cloudflare Workers (`wrangler.jsonc`):**
+  - Añadido `wrangler.jsonc` en la raíz del repositorio con `"name": "deepsea-agy"`, `"compatibility_date": "2026-11-03"`, `"workers_dev": true`, `"preview_urls": true` y `"assets": { "directory": "./dist" }` para eliminar los avisos de configuración del CI de Cloudflare sin afectar al entorno local ni a despliegues en otros proveedores.
 - **Hito 2.5 — Retorno a Base Naval, *Kriegstagebuch* y Campaña Multi-Patrulla (`src/layers/strategic/domain/PatrolRefitRules.ts`, `src/layers/strategic/view/KriegstagebuchModalRenderer.ts`):**
   - Implementado el atraque en cualquiera de las bases propias de la costa francesa (`Brest`, `Lorient`, `Saint-Nazaire`) tras zarpar (`turnNumber > 1`), más cierre automático `ABORTED_AT_SEA` por agotamiento en alta mar con penalización de remolque (`+10` días).
   - Generación de `KriegstagebuchPatrolSummary` y modal mecanografiado `KriegstagebuchModalRenderer` con días en la mar, cumplimiento de orden BdU, buques/BRT de patrulla y carrera, precisión de torpedos y días de dique seco (`14` base + reparación de casco + rearme).

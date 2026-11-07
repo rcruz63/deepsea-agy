@@ -51,6 +51,7 @@ flowchart TD
 /
 ├── AGENTS.md                             # Reglas de ingeniería activas automáticamente en cada sesión
 ├── CHANGELOG.md                          # Historial cronológico inverso (Keep a Changelog)
+├── wrangler.jsonc                        # Configuración declarativa de activos estáticos para Cloudflare Workers
 ├── docs/
 │   ├── ARCHITECTURE.md                   # Mapa modular, contratos y diagramas de flujo
 │   ├── GAME_DESIGN.md                    # Fórmulas matemáticas y reglas mecánicas cerradas

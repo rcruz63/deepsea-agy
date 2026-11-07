@@ -8,6 +8,8 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
 ## [Unreleased]
 
 ### Added
+- **Configuración de Despliegue en Cloudflare Workers (`wrangler.jsonc`):**
+  - Añadido manifiesto `wrangler.jsonc` en la raíz (`name: "deepsea-agy"`, `assets.directory: "./dist"`) para alinear el CI de Cloudflare Workers Builds y eliminar advertencias de despliegue sin acoplar el proyecto a ningún proveedor cloud.
 - **Hito 2.5 — Retorno a Base Naval, *Kriegstagebuch* y Campaña Multi-Patrulla (`src/layers/strategic/`):**
   - Reglas `PatrolRefitRules` para atraque en `Brest`, `Lorient` o `Saint-Nazaire`, remolque automático `ABORTED_AT_SEA`, cálculo de días de carena/rearme (`14` base + casco + torpedos), restauración al `100%` y rotación de orden BdU y tráfico en la Patrulla `N + 1`.
   - Renderizador modal `KriegstagebuchModalRenderer` con hoja mecanografiada del diario de guerra alemán (*KTB*) y botón de zarpe a la siguiente patrulla.

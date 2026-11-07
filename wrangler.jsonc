@@ -1,0 +1,11 @@
+{
+  // Configuración declarativa para despliegue de activos estáticos en Cloudflare Workers.
+  // Ignorado por Vite en local (npm run dev / build) y por cualquier otro proveedor cloud (GitHub Pages, AWS, GCP).
+  "name": "deepsea-agy",
+  "compatibility_date": "2026-11-03",
+  "workers_dev": true,
+  "preview_urls": true,
+  "assets": {
+    "directory": "./dist"
+  }
+}
